@@ -1,0 +1,25 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.sln.docstates
+
+# Frontend
+ftpcloud-ui/node_modules/
+ftpcloud-ui/dist/
+ftpcloud-ui/*.tsbuildinfo
+
+# Backend (ASP.NET) — cuando se cree
+ftpcloud-api/bin/
+ftpcloud-api/obj/
+ftpcloud-api/*.user
