@@ -1,4 +1,5 @@
 using FtpCloud.Api.Common;
+using FtpCloud.Application.Common;
 using FtpCloud.Application.Dtos;
 using FtpCloud.Application.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -27,7 +28,7 @@ public class FilesController(IFileService fileService) : ApiControllerBase
 
     [HttpPost("folders")]
     public async Task<ActionResult<ApiResponse<FolderDto>>> CreateFolder(CreateFolderRequest request) =>
-        ApiOk(await fileService.CreateFolderAsync(User.GetUserId(), request.Name));
+        ApiOk(await fileService.CreateFolderAsync(User.GetUserId(), request.Name, request.ParentFolderId));
 
     [HttpDelete("folders/{id:guid}")]
     public async Task<IActionResult> DeleteFolder(Guid id)
@@ -35,6 +36,18 @@ public class FilesController(IFileService fileService) : ApiControllerBase
         await fileService.DeleteFolderAsync(User.GetUserId(), id);
         return ApiOkEmpty();
     }
+
+    [HttpPut("folders/{id:guid}")]
+    public async Task<ActionResult<ApiResponse<FolderDto>>> RenameFolder(Guid id, RenameRequest request) =>
+        ApiOk(await fileService.RenameFolderAsync(User.GetUserId(), id, request.Name));
+
+    [HttpPut("folders/{id:guid}/move")]
+    public async Task<ActionResult<ApiResponse<FolderDto>>> MoveFolder(Guid id, MoveRequest request) =>
+        ApiOk(await fileService.MoveFolderAsync(User.GetUserId(), id, request.TargetFolderId));
+
+    [HttpGet("folders/{id:guid}/tree")]
+    public async Task<ActionResult<ApiResponse<List<FolderTreeNodeDto>>>> GetFolderTree(Guid id) =>
+        ApiOk(await fileService.GetFolderTreeAsync(User.GetUserId(), id));
 
     [HttpGet("folders/{id:guid}/members")]
     public async Task<ActionResult<ApiResponse<List<FolderMemberDto>>>> GetMembers(Guid id) =>
@@ -51,15 +64,6 @@ public class FilesController(IFileService fileService) : ApiControllerBase
         return ApiOkEmpty();
     }
 
-    [HttpPost("upload"), RequestSizeLimit(500_000_000)]
-    public async Task<ActionResult<ApiResponse<FileItemDto>>> Upload([FromForm] Guid folderId, IFormFile file)
-    {
-        await using var stream = file.OpenReadStream();
-        var dto = await fileService.UploadFileAsync(
-            User.GetUserId(), folderId, file.FileName, file.ContentType, file.Length, stream);
-        return ApiOk(dto);
-    }
-
     [HttpGet("{id:guid}/download")]
     public async Task<IActionResult> Download(Guid id)
     {
@@ -72,5 +76,18 @@ public class FilesController(IFileService fileService) : ApiControllerBase
     {
         await fileService.DeleteFileAsync(User.GetUserId(), id);
         return ApiOkEmpty();
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<ApiResponse<FileItemDto>>> RenameFile(Guid id, RenameRequest request) =>
+        ApiOk(await fileService.RenameFileAsync(User.GetUserId(), id, request.Name));
+
+    [HttpPut("{id:guid}/move")]
+    public async Task<ActionResult<ApiResponse<FileItemDto>>> MoveFile(Guid id, MoveRequest request)
+    {
+        if (request.TargetFolderId is null)
+            throw new ServiceException(400, "Debes indicar la carpeta de destino");
+
+        return ApiOk(await fileService.MoveFileAsync(User.GetUserId(), id, request.TargetFolderId.Value));
     }
 }

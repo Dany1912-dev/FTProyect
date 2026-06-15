@@ -1,23 +1,20 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { api } from '@/services/api'
-import type { ApiResponse, Folder } from '@/types'
+import type { ApiResponse, Folder, FileItem } from '@/types'
 
-const props = withDefaults(
-  defineProps<{ endpoint?: string; title?: string; parentFolderId?: string | null }>(),
-  {
-    endpoint: '/files/folders',
-    title: 'Nueva carpeta',
-    parentFolderId: null,
-  },
-)
+const props = defineProps<{
+  kind: 'folder' | 'file'
+  id: string
+  currentName: string
+}>()
 
 const emit = defineEmits<{
   close: []
-  created: [folder: Folder]
+  renamed: [item: Folder | FileItem]
 }>()
 
-const name = ref('')
+const name = ref(props.currentName)
 const error = ref('')
 const isSubmitting = ref(false)
 
@@ -25,13 +22,11 @@ async function handleSubmit() {
   error.value = ''
   isSubmitting.value = true
   try {
-    const res = await api.post<ApiResponse<Folder>>(props.endpoint, {
-      name: name.value,
-      parentFolderId: props.parentFolderId,
-    })
-    emit('created', res.data)
+    const endpoint = props.kind === 'folder' ? `/files/folders/${props.id}` : `/files/${props.id}`
+    const res = await api.put<ApiResponse<Folder | FileItem>>(endpoint, { name: name.value })
+    emit('renamed', res.data)
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Error al crear la carpeta'
+    error.value = e instanceof Error ? e.message : 'Error al renombrar'
   } finally {
     isSubmitting.value = false
   }
@@ -41,12 +36,12 @@ async function handleSubmit() {
 <template>
   <div class="overlay" @click.self="$emit('close')">
     <div class="modal">
-      <h3 class="modal-title">{{ title }}</h3>
+      <h3 class="modal-title">Renombrar</h3>
 
       <form @submit.prevent="handleSubmit" class="modal-form">
         <div class="form-group">
-          <label for="folder-name">Nombre</label>
-          <input id="folder-name" v-model="name" type="text" autofocus required />
+          <label for="rename-name">Nombre</label>
+          <input id="rename-name" v-model="name" type="text" autofocus required />
         </div>
 
         <p v-if="error" class="error-msg">{{ error }}</p>
@@ -54,7 +49,7 @@ async function handleSubmit() {
         <div class="modal-actions">
           <button type="button" class="btn-cancel" @click="$emit('close')">Cancelar</button>
           <button type="submit" class="btn-submit" :disabled="isSubmitting">
-            {{ isSubmitting ? 'Creando...' : 'Crear' }}
+            {{ isSubmitting ? 'Guardando...' : 'Guardar' }}
           </button>
         </div>
       </form>

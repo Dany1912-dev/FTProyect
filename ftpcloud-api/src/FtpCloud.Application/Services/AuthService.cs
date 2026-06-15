@@ -9,6 +9,7 @@ namespace FtpCloud.Application.Services;
 public class AuthService(
     IUserRepository userRepository,
     IRefreshTokenRepository refreshTokenRepository,
+    IFolderRepository folderRepository,
     IPasswordHasher passwordHasher,
     IJwtService jwtService) : IAuthService
 {
@@ -32,7 +33,8 @@ public class AuthService(
         await refreshTokenRepository.AddAsync(refreshToken);
         await refreshTokenRepository.SaveChangesAsync();
 
-        return (user.ToDto(), accessToken, refreshToken);
+        var usedBytes = await folderRepository.GetTotalSizeForOwnerAsync(user.Id);
+        return (user.ToDto(usedBytes), accessToken, refreshToken);
     }
 
     public async Task<(UserDto User, string AccessToken, RefreshToken RefreshToken)> RefreshAsync(string refreshTokenValue)
@@ -63,7 +65,8 @@ public class AuthService(
         await refreshTokenRepository.AddAsync(newRefreshToken);
         await refreshTokenRepository.SaveChangesAsync();
 
-        return (user.ToDto(), accessToken, newRefreshToken);
+        var usedBytes = await folderRepository.GetTotalSizeForOwnerAsync(user.Id);
+        return (user.ToDto(usedBytes), accessToken, newRefreshToken);
     }
 
     public async Task LogoutAsync(string refreshTokenValue)
@@ -80,7 +83,8 @@ public class AuthService(
         var user = await userRepository.GetByIdAsync(userId)
             ?? throw new ServiceException(401, "Usuario no encontrado");
 
-        return user.ToDto();
+        var usedBytes = await folderRepository.GetTotalSizeForOwnerAsync(userId);
+        return user.ToDto(usedBytes);
     }
 
     public async Task ChangePasswordAsync(Guid userId, string currentPassword, string newPassword)

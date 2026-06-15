@@ -18,7 +18,7 @@ public class FileService(
         if (folderId is null)
         {
             var roots = await folderRepository.GetByOwnerAndTypeAsync(userId, FolderType.Personal);
-            return new FolderContentsDto(null, roots.Select(f => f.ToDto()).ToList(), []);
+            return new FolderContentsDto(null, [], roots.Select(f => f.ToDto()).ToList(), []);
         }
 
         var folder = await folderRepository.GetByIdAsync(folderId.Value)
@@ -27,8 +27,7 @@ public class FileService(
         if (folder.OwnerId != userId)
             throw new ServiceException(403, "No tienes acceso a esta carpeta");
 
-        var files = await fileRepository.GetByFolderAsync(folder.Id);
-        return new FolderContentsDto(folder.ToDto(), [], files.Select(f => f.ToDto()).ToList());
+        return await BuildFolderContentsAsync(folder);
     }
 
     public async Task<FolderContentsDto> GetSharedAsync(Guid userId, Guid? folderId)
@@ -36,7 +35,7 @@ public class FileService(
         if (folderId is null)
         {
             var shared = await folderRepository.GetSharedWithUserAsync(userId);
-            return new FolderContentsDto(null, shared.Select(f => f.ToDto()).ToList(), []);
+            return new FolderContentsDto(null, [], shared.Select(f => f.ToDto()).ToList(), []);
         }
 
         var folder = await folderRepository.GetByIdAsync(folderId.Value)
@@ -45,12 +44,10 @@ public class FileService(
         if (folder.OwnerId == userId)
             throw new ServiceException(404, "Carpeta no encontrada");
 
-        var membership = await folderRepository.GetMembershipAsync(folder.Id, userId)
+        var membership = await folderRepository.GetMembershipAsync(folder.RootFolderId, userId)
             ?? throw new ServiceException(403, "No tienes acceso a esta carpeta");
 
-        var files = await fileRepository.GetByFolderAsync(folder.Id);
-        return new FolderContentsDto(folder.ToDto(), [], files.Select(f => f.ToDto()).ToList(),
-            membership.Role.ToString().ToLowerInvariant());
+        return await BuildFolderContentsAsync(folder, membership.Role.ToString().ToLowerInvariant());
     }
 
     public async Task<FolderContentsDto> GetGroupsAsync(Guid userId, Guid? folderId)
@@ -58,7 +55,7 @@ public class FileService(
         if (folderId is null)
         {
             var groups = await folderRepository.GetGroupsForUserAsync(userId);
-            return new FolderContentsDto(null, groups.Select(f => f.ToDto()).ToList(), []);
+            return new FolderContentsDto(null, [], groups.Select(f => f.ToDto()).ToList(), []);
         }
 
         var folder = await folderRepository.GetByIdAsync(folderId.Value)
@@ -74,42 +71,68 @@ public class FileService(
         }
         else
         {
-            var membership = await folderRepository.GetMembershipAsync(folder.Id, userId)
+            var membership = await folderRepository.GetMembershipAsync(folder.RootFolderId, userId)
                 ?? throw new ServiceException(403, "No tienes acceso a este grupo");
             myRole = membership.Role.ToString().ToLowerInvariant();
         }
 
-        var files = await fileRepository.GetByFolderAsync(folder.Id);
-        return new FolderContentsDto(folder.ToDto(), [], files.Select(f => f.ToDto()).ToList(), myRole);
+        return await BuildFolderContentsAsync(folder, myRole);
     }
 
-    public Task<FolderDto> CreateFolderAsync(Guid userId, string name) =>
-        CreateFolderInternalAsync(userId, name, FolderType.Personal);
+    private async Task<FolderContentsDto> BuildFolderContentsAsync(Folder folder, string? myRole = null)
+    {
+        var subfolders = await folderRepository.GetSubfoldersAsync(folder.Id);
+        var ancestors = await folderRepository.GetAncestorsAsync(folder.Id);
+        var files = await fileRepository.GetByFolderAsync(folder.Id);
+
+        return new FolderContentsDto(folder.ToDto(), ancestors.Select(f => f.ToDto()).ToList(),
+            subfolders.Select(f => f.ToDto()).ToList(), files.Select(f => f.ToDto()).ToList(), myRole);
+    }
+
+    public Task<FolderDto> CreateFolderAsync(Guid userId, string name, Guid? parentFolderId) =>
+        CreateFolderInternalAsync(userId, name, FolderType.Personal, parentFolderId);
 
     public Task<FolderDto> CreateGroupAsync(Guid userId, string name) =>
-        CreateFolderInternalAsync(userId, name, FolderType.Group);
+        CreateFolderInternalAsync(userId, name, FolderType.Group, null);
 
-    private async Task<FolderDto> CreateFolderInternalAsync(Guid userId, string name, FolderType type)
+    private async Task<FolderDto> CreateFolderInternalAsync(Guid userId, string name, FolderType type, Guid? parentFolderId)
     {
         name = name.Trim();
         if (string.IsNullOrWhiteSpace(name))
             throw new ServiceException(400, "El nombre es obligatorio");
 
-        if (await folderRepository.NameExistsForOwnerAndTypeAsync(userId, name, type))
-            throw new ServiceException(409, "Ya existe una carpeta con ese nombre");
+        Folder? parent = null;
+        var ownerId = userId;
+
+        if (parentFolderId is not null)
+        {
+            parent = await folderRepository.GetByIdAsync(parentFolderId.Value)
+                ?? throw new ServiceException(404, "Carpeta no encontrada");
+
+            await EnsureAccessAsync(parent, userId, requireWrite: true);
+
+            ownerId = parent.OwnerId;
+            type = parent.Type;
+        }
+
+        if (await folderRepository.NameExistsInFolderAsync(parentFolderId, ownerId, type, name))
+            throw new ServiceException(409, "Ya existe una carpeta con ese nombre aquí");
 
         var folder = new Folder
         {
             Id = Guid.NewGuid(),
             Name = name,
             Type = type,
-            OwnerId = userId,
+            OwnerId = ownerId,
+            ParentFolderId = parentFolderId,
             CreatedAt = DateTime.UtcNow
         };
+        folder.RootFolderId = parent is null ? folder.Id : parent.RootFolderId;
+
         await folderRepository.AddAsync(folder);
         await folderRepository.SaveChangesAsync();
 
-        folder.Owner = (await userRepository.GetByIdAsync(userId))!;
+        folder.Owner = (await userRepository.GetByIdAsync(ownerId))!;
         return folder.ToDto();
     }
 
@@ -121,12 +144,111 @@ public class FileService(
         if (folder.OwnerId != userId)
             throw new ServiceException(403, "No tienes acceso a esta carpeta");
 
+        await DeleteFilesRecursivelyAsync(folder.Id);
+
+        folderRepository.Remove(folder); // cascade borra subcarpetas, FileEntity y FolderMember en la BD
+        await folderRepository.SaveChangesAsync();
+    }
+
+    private async Task DeleteFilesRecursivelyAsync(Guid folderId)
+    {
         var files = await fileRepository.GetByFolderAsync(folderId);
         foreach (var file in files)
             fileStorage.Delete(file.StoragePath);
 
-        folderRepository.Remove(folder); // cascade borra FileEntity y FolderMember en la BD
+        var subfolders = await folderRepository.GetSubfoldersAsync(folderId);
+        foreach (var sub in subfolders)
+            await DeleteFilesRecursivelyAsync(sub.Id);
+    }
+
+    public async Task<FolderDto> RenameFolderAsync(Guid userId, Guid folderId, string newName)
+    {
+        newName = newName.Trim();
+        if (string.IsNullOrWhiteSpace(newName))
+            throw new ServiceException(400, "El nombre es obligatorio");
+
+        var folder = await folderRepository.GetByIdAsync(folderId)
+            ?? throw new ServiceException(404, "Carpeta no encontrada");
+
+        await EnsureAccessAsync(folder, userId, requireWrite: true);
+
+        if (await folderRepository.NameExistsInFolderAsync(folder.ParentFolderId, folder.OwnerId, folder.Type, newName, excludeId: folder.Id))
+            throw new ServiceException(409, "Ya existe una carpeta con ese nombre aquí");
+
+        folder.Name = newName;
         await folderRepository.SaveChangesAsync();
+        return folder.ToDto();
+    }
+
+    public async Task<FolderDto> MoveFolderAsync(Guid userId, Guid folderId, Guid? targetFolderId)
+    {
+        var folder = await folderRepository.GetByIdAsync(folderId)
+            ?? throw new ServiceException(404, "Carpeta no encontrada");
+
+        await EnsureAccessAsync(folder, userId, requireWrite: true);
+
+        var tree = await folderRepository.GetTreeByOwnerAsync(folder.OwnerId);
+        var childrenByParent = tree.Where(f => f.ParentFolderId.HasValue)
+            .GroupBy(f => f.ParentFolderId!.Value)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var descendants = new List<Folder>();
+        void Collect(Guid id)
+        {
+            if (!childrenByParent.TryGetValue(id, out var kids)) return;
+            foreach (var kid in kids)
+            {
+                descendants.Add(kid);
+                Collect(kid.Id);
+            }
+        }
+        Collect(folder.Id);
+
+        Guid newRootId;
+        if (targetFolderId is null)
+        {
+            newRootId = folder.Id;
+        }
+        else
+        {
+            if (targetFolderId == folder.Id || descendants.Any(d => d.Id == targetFolderId.Value))
+                throw new ServiceException(400, "No puedes mover una carpeta dentro de sí misma");
+
+            var target = await folderRepository.GetByIdAsync(targetFolderId.Value)
+                ?? throw new ServiceException(404, "Carpeta de destino no encontrada");
+
+            await EnsureAccessAsync(target, userId, requireWrite: true);
+
+            if (target.OwnerId != folder.OwnerId)
+                throw new ServiceException(400, "No puedes mover a una carpeta de otro dueño");
+
+            newRootId = target.RootFolderId;
+        }
+
+        if (await folderRepository.NameExistsInFolderAsync(targetFolderId, folder.OwnerId, folder.Type, folder.Name, excludeId: folder.Id))
+            throw new ServiceException(409, "Ya existe una carpeta con ese nombre en el destino");
+
+        folder.ParentFolderId = targetFolderId;
+        if (folder.RootFolderId != newRootId)
+        {
+            folder.RootFolderId = newRootId;
+            foreach (var descendant in descendants)
+                descendant.RootFolderId = newRootId;
+        }
+
+        await folderRepository.SaveChangesAsync();
+        return folder.ToDto();
+    }
+
+    public async Task<List<FolderTreeNodeDto>> GetFolderTreeAsync(Guid userId, Guid rootFolderId)
+    {
+        var folder = await folderRepository.GetByIdAsync(rootFolderId)
+            ?? throw new ServiceException(404, "Carpeta no encontrada");
+
+        await EnsureAccessAsync(folder, userId, requireWrite: true);
+
+        var nodes = await folderRepository.GetByRootIdAsync(folder.RootFolderId);
+        return nodes.Select(f => f.ToTreeNodeDto()).ToList();
     }
 
     public async Task<List<FolderMemberDto>> GetFolderMembersAsync(Guid userId, Guid folderId)
@@ -136,7 +258,7 @@ public class FileService(
 
         await EnsureAccessAsync(folder, userId, requireWrite: false);
 
-        var members = await folderRepository.GetMembersAsync(folderId);
+        var members = await folderRepository.GetMembersAsync(folder.RootFolderId);
         return members.Select(m => m.ToDto()).ToList();
     }
 
@@ -157,10 +279,10 @@ public class FileService(
         if (target.Id == folder.OwnerId)
             throw new ServiceException(400, "No puedes compartir la carpeta contigo mismo");
 
-        if (await folderRepository.GetMembershipAsync(folderId, target.Id) is not null)
+        if (await folderRepository.GetMembershipAsync(folder.RootFolderId, target.Id) is not null)
             throw new ServiceException(409, "Ese usuario ya tiene acceso");
 
-        var member = new FolderMember { FolderId = folderId, UserId = target.Id, Role = parsedRole };
+        var member = new FolderMember { FolderId = folder.RootFolderId, UserId = target.Id, Role = parsedRole };
         await folderRepository.AddMemberAsync(member);
         await folderRepository.SaveChangesAsync();
 
@@ -176,19 +298,36 @@ public class FileService(
         if (folder.OwnerId != userId && userId != targetUserId)
             throw new ServiceException(403, "No tienes permiso para hacer esto");
 
-        var member = await folderRepository.GetMembershipAsync(folderId, targetUserId)
+        var member = await folderRepository.GetMembershipAsync(folder.RootFolderId, targetUserId)
             ?? throw new ServiceException(404, "Ese usuario no tiene acceso a la carpeta");
 
         folderRepository.RemoveMember(member);
         await folderRepository.SaveChangesAsync();
     }
 
-    public async Task<FileItemDto> UploadFileAsync(Guid userId, Guid folderId, string fileName, string? contentType, long size, Stream content)
+    public Task EnsureUploadAllowedAsync(Guid userId, Guid folderId, long size) =>
+        EnsureUploadAllowedInternalAsync(userId, folderId, size);
+
+    private async Task<Folder> EnsureUploadAllowedInternalAsync(Guid userId, Guid folderId, long size)
     {
         var folder = await folderRepository.GetByIdAsync(folderId)
             ?? throw new ServiceException(404, "Carpeta no encontrada");
 
         await EnsureAccessAsync(folder, userId, requireWrite: true);
+
+        var owner = await userRepository.GetByIdAsync(folder.OwnerId)
+            ?? throw new ServiceException(404, "Propietario no encontrado");
+
+        var used = await folderRepository.GetTotalSizeForOwnerAsync(folder.OwnerId);
+        if (used + size > owner.StorageQuotaBytes)
+            throw new ServiceException(413, "Se alcanzó el límite de almacenamiento");
+
+        return folder;
+    }
+
+    public async Task<FileItemDto> UploadFileAsync(Guid userId, Guid folderId, string fileName, string? contentType, long size, Stream content)
+    {
+        var folder = await EnsureUploadAllowedInternalAsync(userId, folderId, size);
 
         var file = new FileEntity
         {
@@ -229,11 +368,47 @@ public class FileService(
         await fileRepository.SaveChangesAsync();
     }
 
+    public async Task<FileItemDto> RenameFileAsync(Guid userId, Guid fileId, string newName)
+    {
+        newName = newName.Trim();
+        if (string.IsNullOrWhiteSpace(newName))
+            throw new ServiceException(400, "El nombre es obligatorio");
+
+        var file = await fileRepository.GetByIdAsync(fileId)
+            ?? throw new ServiceException(404, "Archivo no encontrado");
+
+        await EnsureAccessAsync(file.Folder, userId, requireWrite: true);
+
+        file.Name = newName;
+        await fileRepository.SaveChangesAsync();
+        return file.ToDto();
+    }
+
+    public async Task<FileItemDto> MoveFileAsync(Guid userId, Guid fileId, Guid targetFolderId)
+    {
+        var file = await fileRepository.GetByIdAsync(fileId)
+            ?? throw new ServiceException(404, "Archivo no encontrado");
+
+        await EnsureAccessAsync(file.Folder, userId, requireWrite: true);
+
+        var target = await folderRepository.GetByIdAsync(targetFolderId)
+            ?? throw new ServiceException(404, "Carpeta de destino no encontrada");
+
+        await EnsureAccessAsync(target, userId, requireWrite: true);
+
+        if (target.OwnerId != file.Folder.OwnerId)
+            throw new ServiceException(400, "No puedes mover a una carpeta de otro dueño");
+
+        file.FolderId = target.Id;
+        await fileRepository.SaveChangesAsync();
+        return file.ToDto();
+    }
+
     private async Task EnsureAccessAsync(Folder folder, Guid userId, bool requireWrite)
     {
         if (folder.OwnerId == userId) return;
 
-        var membership = await folderRepository.GetMembershipAsync(folder.Id, userId);
+        var membership = await folderRepository.GetMembershipAsync(folder.RootFolderId, userId);
         if (membership is null)
             throw new ServiceException(403, "No tienes acceso a esta carpeta");
 

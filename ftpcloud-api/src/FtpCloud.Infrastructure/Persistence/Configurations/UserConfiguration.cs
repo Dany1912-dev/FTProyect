@@ -16,6 +16,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         b.Property(u => u.Role)
             .HasConversion(r => r.ToString().ToLower(), s => Enum.Parse<UserRole>(s, true))
             .HasMaxLength(10).IsRequired();
+        b.Property(u => u.StorageQuotaBytes).HasDefaultValue(21474836480L);
 
         b.HasIndex(u => u.Username).IsUnique();
         b.HasIndex(u => u.Email).IsUnique();

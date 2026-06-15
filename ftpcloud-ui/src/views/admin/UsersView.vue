@@ -30,6 +30,13 @@ function onCreated(user: User) {
   showCreateModal.value = false
 }
 
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
+}
+
 async function handleDelete(user: User) {
   const confirmed = await dialog.confirm({
     title: 'Eliminar usuario',
@@ -66,6 +73,7 @@ async function handleDelete(user: User) {
           <th>Usuario</th>
           <th>Email</th>
           <th>Rol</th>
+          <th>Uso</th>
           <th>Creado</th>
           <th v-if="auth.isOwner">Acciones</th>
         </tr>
@@ -76,6 +84,12 @@ async function handleDelete(user: User) {
           <td>{{ user.email }}</td>
           <td>
             <span class="role-badge" :class="user.role">{{ user.role }}</span>
+          </td>
+          <td class="td-usage">
+            <template v-if="user.role !== 'owner'">
+              {{ formatSize(user.storageUsedBytes) }} / {{ formatSize(user.storageQuotaBytes) }}
+            </template>
+            <template v-else>—</template>
           </td>
           <td class="td-date">{{ new Date(user.createdAt).toLocaleDateString() }}</td>
           <td v-if="auth.isOwner" class="td-actions">
@@ -157,6 +171,11 @@ async function handleDelete(user: User) {
 
 .td-date {
   font-size: 0.8rem;
+}
+
+.td-usage {
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 .role-badge {

@@ -3,18 +3,24 @@ import { ref, onMounted } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useDialogStore } from '@/stores/dialog'
 import { api, BASE_URL } from '@/services/api'
+import { startTusUpload } from '@/services/tus'
 import type { ApiResponse, FolderContents, Folder, FileItem } from '@/types'
 import CreateFolderModal from '@/components/files/CreateFolderModal.vue'
 import FolderMembersModal from '@/components/files/FolderMembersModal.vue'
+import RenameModal from '@/components/files/RenameModal.vue'
+import MoveModal from '@/components/files/MoveModal.vue'
 
 const filesStore = useFilesStore()
 const dialog = useDialogStore()
 
 const showCreateGroup = ref(false)
 const showMembers = ref(false)
-const isUploading = ref(false)
+const showCreateFolder = ref(false)
+const uploadProgress = ref<number | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const myRole = ref<'owner' | 'editor' | 'viewer' | null>(null)
+const renameTarget = ref<{ kind: 'folder' | 'file'; id: string; name: string } | null>(null)
+const moveTarget = ref<{ kind: 'folder' | 'file'; id: string; rootFolderId: string; excludeId?: string } | null>(null)
 
 onMounted(() => load())
 
@@ -24,6 +30,7 @@ async function load(folderId?: string) {
     const query = folderId ? `?folderId=${folderId}` : ''
     const res = await api.get<ApiResponse<FolderContents>>(`/files/groups${query}`)
     filesStore.setCurrentFolder(res.data.folder ?? null)
+    filesStore.setPath(res.data.path)
     filesStore.setFolders(res.data.folders)
     filesStore.setFiles(res.data.files)
     myRole.value = (res.data.myRole as 'owner' | 'editor' | 'viewer' | undefined) ?? null
@@ -73,6 +80,41 @@ async function handleDeleteGroup() {
   }
 }
 
+function onSubfolderCreated() {
+  showCreateFolder.value = false
+  load(filesStore.currentFolder?.id)
+}
+
+function handleRenameFolder(folder: Folder) {
+  renameTarget.value = { kind: 'folder', id: folder.id, name: folder.name }
+}
+
+function handleRenameFile(file: FileItem) {
+  renameTarget.value = { kind: 'file', id: file.id, name: file.name }
+}
+
+function onRenamed() {
+  renameTarget.value = null
+  load(filesStore.currentFolder?.id)
+}
+
+function rootFolderIdFor(): string {
+  return filesStore.path[0]?.id ?? filesStore.currentFolder!.id
+}
+
+function handleMoveFolder(folder: Folder) {
+  moveTarget.value = { kind: 'folder', id: folder.id, rootFolderId: rootFolderIdFor(), excludeId: folder.id }
+}
+
+function handleMoveFile(file: FileItem) {
+  moveTarget.value = { kind: 'file', id: file.id, rootFolderId: rootFolderIdFor() }
+}
+
+function onMoved() {
+  moveTarget.value = null
+  load(filesStore.currentFolder?.id)
+}
+
 function triggerUpload() {
   fileInput.value?.click()
 }
@@ -82,23 +124,24 @@ async function onFileSelected(event: Event) {
   const file = input.files?.[0]
   if (!file || !filesStore.currentFolder) return
 
-  const formData = new FormData()
-  formData.append('folderId', filesStore.currentFolder.id)
-  formData.append('file', file)
-
-  isUploading.value = true
-  try {
-    await api.upload('/files/upload', formData)
-    await load(filesStore.currentFolder.id)
-  } catch (e) {
-    await dialog.alert({
-      title: 'Error',
-      message: e instanceof Error ? e.message : 'No se pudo subir el archivo',
-    })
-  } finally {
-    isUploading.value = false
-    input.value = ''
-  }
+  uploadProgress.value = 0
+  startTusUpload({
+    file,
+    folderId: filesStore.currentFolder.id,
+    onProgress: (percent) => {
+      uploadProgress.value = percent
+    },
+    onSuccess: async () => {
+      uploadProgress.value = null
+      input.value = ''
+      await load(filesStore.currentFolder!.id)
+    },
+    onError: async (message) => {
+      uploadProgress.value = null
+      input.value = ''
+      await dialog.alert({ title: 'Error', message })
+    },
+  })
 }
 
 async function handleDeleteFile(file: FileItem) {
@@ -141,6 +184,10 @@ function formatSize(bytes: number): string {
         <span class="breadcrumb-item" :class="{ link: filesStore.currentFolder }" @click="goToRoot">
           Grupos
         </span>
+        <template v-for="p in filesStore.path" :key="p.id">
+          <span class="separator">/</span>
+          <span class="breadcrumb-item link" @click="load(p.id)">{{ p.name }}</span>
+        </template>
         <template v-if="filesStore.currentFolder">
           <span class="separator">/</span>
           <span class="breadcrumb-item current">{{ filesStore.currentFolder.name }}</span>
@@ -153,14 +200,12 @@ function formatSize(bytes: number): string {
         </template>
         <template v-else>
           <button class="header-btn" @click="showMembers = true">Miembros</button>
-          <button
-            v-if="myRole === 'owner' || myRole === 'editor'"
-            class="header-btn"
-            :disabled="isUploading"
-            @click="triggerUpload"
-          >
-            {{ isUploading ? 'Subiendo...' : '+ Subir archivo' }}
-          </button>
+          <template v-if="myRole === 'owner' || myRole === 'editor'">
+            <button class="header-btn" @click="showCreateFolder = true">+ Nueva subcarpeta</button>
+            <button class="header-btn" :disabled="uploadProgress !== null" @click="triggerUpload">
+              {{ uploadProgress !== null ? `Subiendo... ${uploadProgress}%` : '+ Subir archivo' }}
+            </button>
+          </template>
           <button v-if="myRole === 'owner'" class="header-btn danger" @click="handleDeleteGroup">
             Eliminar grupo
           </button>
@@ -185,9 +230,13 @@ function formatSize(bytes: number): string {
             class="folder-card"
             @click="openFolder(folder)"
           >
-            <span class="folder-icon">👥</span>
+            <span class="folder-icon">{{ folder.parentFolderId ? '📁' : '👥' }}</span>
             <span class="folder-name">{{ folder.name }}</span>
             <span class="folder-owner">creado por {{ folder.ownerUsername }}</span>
+            <div v-if="filesStore.currentFolder && (myRole === 'owner' || myRole === 'editor')" class="folder-actions">
+              <button class="action-btn" @click.stop="handleRenameFolder(folder)">Renombrar</button>
+              <button class="action-btn" @click.stop="handleMoveFolder(folder)">Mover</button>
+            </div>
           </div>
         </div>
       </div>
@@ -200,13 +249,11 @@ function formatSize(bytes: number): string {
             <span class="file-size">{{ formatSize(file.size) }}</span>
             <div class="file-actions">
               <a class="action-btn" :href="`${BASE_URL}/files/${file.id}/download`" download>Descargar</a>
-              <button
-                v-if="myRole === 'owner' || myRole === 'editor'"
-                class="action-btn danger"
-                @click="handleDeleteFile(file)"
-              >
-                Eliminar
-              </button>
+              <template v-if="myRole === 'owner' || myRole === 'editor'">
+                <button class="action-btn" @click="handleRenameFile(file)">Renombrar</button>
+                <button class="action-btn" @click="handleMoveFile(file)">Mover</button>
+                <button class="action-btn danger" @click="handleDeleteFile(file)">Eliminar</button>
+              </template>
             </div>
           </div>
         </div>
@@ -231,6 +278,33 @@ function formatSize(bytes: number): string {
       :folder="filesStore.currentFolder"
       @close="showMembers = false"
       @left="onLeftGroup"
+    />
+
+    <CreateFolderModal
+      v-if="showCreateFolder"
+      title="Nueva subcarpeta"
+      :parent-folder-id="filesStore.currentFolder?.id ?? null"
+      @close="showCreateFolder = false"
+      @created="onSubfolderCreated"
+    />
+
+    <RenameModal
+      v-if="renameTarget"
+      :kind="renameTarget.kind"
+      :id="renameTarget.id"
+      :current-name="renameTarget.name"
+      @close="renameTarget = null"
+      @renamed="onRenamed"
+    />
+
+    <MoveModal
+      v-if="moveTarget"
+      :kind="moveTarget.kind"
+      :id="moveTarget.id"
+      :root-folder-id="moveTarget.rootFolderId"
+      :exclude-id="moveTarget.excludeId"
+      @close="moveTarget = null"
+      @moved="onMoved"
     />
   </div>
 </template>
@@ -368,6 +442,11 @@ function formatSize(bytes: number): string {
   font-size: 0.75rem;
   color: var(--color-text);
   text-align: center;
+}
+
+.folder-actions {
+  display: flex;
+  gap: 0.35rem;
 }
 
 .files-list {

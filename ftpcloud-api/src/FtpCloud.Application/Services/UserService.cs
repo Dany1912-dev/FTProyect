@@ -17,7 +17,10 @@ public class UserService(
     public async Task<List<UserDto>> GetAllAsync()
     {
         var users = await userRepository.GetAllAsync();
-        return users.Select(u => u.ToDto()).ToList();
+        var result = new List<UserDto>();
+        foreach (var user in users)
+            result.Add(user.ToDto(await folderRepository.GetTotalSizeForOwnerAsync(user.Id)));
+        return result;
     }
 
     public async Task<UserDto> CreateAsync(CreateUserRequest request, UserRole creatorRole)
@@ -46,7 +49,7 @@ public class UserService(
         await userRepository.AddAsync(user);
         await userRepository.SaveChangesAsync();
 
-        return user.ToDto();
+        return user.ToDto(0);
     }
 
     public async Task DeleteAsync(Guid id)

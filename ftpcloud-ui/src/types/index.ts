@@ -6,6 +6,8 @@ export interface User {
   email: string
   role: UserRole
   createdAt: string
+  storageUsedBytes: number
+  storageQuotaBytes: number
 }
 
 export interface Folder {
@@ -14,7 +16,14 @@ export interface Folder {
   type: 'personal' | 'shared' | 'group'
   ownerId: string
   ownerUsername: string
+  parentFolderId: string | null
   createdAt: string
+}
+
+export interface FolderTreeNode {
+  id: string
+  name: string
+  parentFolderId: string | null
 }
 
 export interface FileItem {
@@ -35,6 +44,7 @@ export interface FolderMemberInfo {
 
 export interface FolderContents {
   folder?: Folder
+  path: Folder[]
   folders: Folder[]
   files: FileItem[]
   myRole?: 'owner' | 'editor' | 'viewer'

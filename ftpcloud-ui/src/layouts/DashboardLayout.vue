@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/api'
@@ -9,6 +9,23 @@ const auth = useAuthStore()
 const router = useRouter()
 
 const showChangePassword = ref(false)
+
+onMounted(() => {
+  if (!auth.isOwner) auth.restoreSession()
+})
+
+const usagePercent = computed(() => {
+  const user = auth.user
+  if (!user || !user.storageQuotaBytes) return 0
+  return Math.min(100, (user.storageUsedBytes / user.storageQuotaBytes) * 100)
+})
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
+}
 
 async function handleLogout() {
   try {
@@ -43,6 +60,14 @@ async function handleLogout() {
       </nav>
 
       <div class="sidebar-footer">
+        <div v-if="!auth.isOwner && auth.user" class="usage">
+          <div class="usage-bar">
+            <div class="usage-fill" :style="{ width: `${usagePercent}%` }" />
+          </div>
+          <span class="usage-text">
+            {{ formatSize(auth.user.storageUsedBytes) }} / {{ formatSize(auth.user.storageQuotaBytes) }}
+          </span>
+        </div>
         <span class="sidebar-username">{{ auth.user?.username }}</span>
         <div class="footer-actions">
           <button class="footer-btn" @click="showChangePassword = true">Contraseña</button>
@@ -122,6 +147,30 @@ async function handleLogout() {
   padding-top: 0.75rem;
   border-top: 1px solid var(--color-border);
   font-size: 0.85rem;
+}
+
+.usage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.usage-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-background-mute);
+  overflow: hidden;
+}
+
+.usage-fill {
+  height: 100%;
+  background: var(--color-heading);
+  transition: width 0.2s;
+}
+
+.usage-text {
+  font-size: 0.75rem;
+  color: var(--color-text);
 }
 
 .sidebar-username {

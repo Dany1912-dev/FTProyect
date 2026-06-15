@@ -10,7 +10,12 @@ public interface IFolderRepository
     Task<Folder?> GetByIdAsync(Guid id);
     Task<List<Folder>> GetSharedWithUserAsync(Guid userId);
     Task<List<Folder>> GetGroupsForUserAsync(Guid userId);
-    Task<bool> NameExistsForOwnerAndTypeAsync(Guid ownerId, string name, FolderType type);
+    Task<List<Folder>> GetSubfoldersAsync(Guid parentFolderId);
+    Task<List<Folder>> GetAncestorsAsync(Guid folderId);
+    Task<List<Folder>> GetTreeByOwnerAsync(Guid ownerId);
+    Task<List<Folder>> GetByRootIdAsync(Guid rootFolderId);
+    Task<long> GetTotalSizeForOwnerAsync(Guid ownerId);
+    Task<bool> NameExistsInFolderAsync(Guid? parentFolderId, Guid ownerId, FolderType type, string name, Guid? excludeId = null);
     Task<FolderMember?> GetMembershipAsync(Guid folderId, Guid userId);
     Task<List<FolderMember>> GetMembersAsync(Guid folderId);
     Task AddMemberAsync(FolderMember member);
