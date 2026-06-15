@@ -10,6 +10,7 @@ public class FileEntity
     public Guid? UploadedById { get; set; }
     public string StoragePath { get; set; } = null!;
     public DateTime CreatedAt { get; set; }
+    public DateTime? DeletedAt { get; set; }
 
     public Folder Folder { get; set; } = null!;
     public User? UploadedBy { get; set; }

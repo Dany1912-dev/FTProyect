@@ -13,6 +13,8 @@ public class FileEntityConfiguration : IEntityTypeConfiguration<FileEntity>
         b.Property(f => f.MimeType).HasMaxLength(100);
         b.Property(f => f.StoragePath).HasMaxLength(500).IsRequired();
 
+        b.HasIndex(f => f.DeletedAt);
+
         b.HasOne(f => f.Folder)
             .WithMany(folder => folder.Files)
             .HasForeignKey(f => f.FolderId)

@@ -144,21 +144,128 @@ public class FileService(
         if (folder.OwnerId != userId)
             throw new ServiceException(403, "No tienes acceso a esta carpeta");
 
-        await DeleteFilesRecursivelyAsync(folder.Id);
-
-        folderRepository.Remove(folder); // cascade borra subcarpetas, FileEntity y FolderMember en la BD
+        await SetTrashStateRecursivelyAsync(folder.Id, DateTime.UtcNow);
         await folderRepository.SaveChangesAsync();
+    }
+
+    private async Task SetTrashStateRecursivelyAsync(Guid folderId, DateTime? deletedAt)
+    {
+        var folder = await folderRepository.GetByIdAsync(folderId)
+            ?? throw new ServiceException(404, "Carpeta no encontrada");
+
+        folder.DeletedAt = deletedAt;
+
+        var files = await fileRepository.GetByFolderIncludingDeletedAsync(folder.Id);
+        foreach (var file in files)
+            file.DeletedAt = deletedAt;
+
+        var subfolders = await folderRepository.GetSubfoldersIncludingDeletedAsync(folder.Id);
+        foreach (var sub in subfolders)
+            await SetTrashStateRecursivelyAsync(sub.Id, deletedAt);
     }
 
     private async Task DeleteFilesRecursivelyAsync(Guid folderId)
     {
-        var files = await fileRepository.GetByFolderAsync(folderId);
+        var files = await fileRepository.GetByFolderIncludingDeletedAsync(folderId);
         foreach (var file in files)
             fileStorage.Delete(file.StoragePath);
 
-        var subfolders = await folderRepository.GetSubfoldersAsync(folderId);
+        var subfolders = await folderRepository.GetSubfoldersIncludingDeletedAsync(folderId);
         foreach (var sub in subfolders)
             await DeleteFilesRecursivelyAsync(sub.Id);
+    }
+
+    public async Task<TrashContentsDto> GetTrashAsync(Guid userId)
+    {
+        var folders = await folderRepository.GetTrashedAsync(userId);
+        var files = await fileRepository.GetTrashedAsync(userId);
+        return new TrashContentsDto(folders.Select(f => f.ToDto()).ToList(), files.Select(f => f.ToDto()).ToList());
+    }
+
+    public async Task RestoreFolderAsync(Guid userId, Guid folderId)
+    {
+        var folder = await folderRepository.GetByIdAsync(folderId)
+            ?? throw new ServiceException(404, "Carpeta no encontrada");
+
+        if (folder.DeletedAt is null)
+            throw new ServiceException(404, "La carpeta no está en la papelera");
+
+        await EnsureTrashOwnerAsync(folder.RootFolderId, userId);
+
+        await SetTrashStateRecursivelyAsync(folder.Id, null);
+        await folderRepository.SaveChangesAsync();
+    }
+
+    public async Task RestoreFileAsync(Guid userId, Guid fileId)
+    {
+        var file = await fileRepository.GetByIdAsync(fileId)
+            ?? throw new ServiceException(404, "Archivo no encontrado");
+
+        if (file.DeletedAt is null)
+            throw new ServiceException(404, "El archivo no está en la papelera");
+
+        await EnsureTrashOwnerAsync(file.Folder.RootFolderId, userId);
+
+        file.DeletedAt = null;
+        await fileRepository.SaveChangesAsync();
+    }
+
+    public async Task PermanentlyDeleteFolderAsync(Guid userId, Guid folderId)
+    {
+        var folder = await folderRepository.GetByIdAsync(folderId)
+            ?? throw new ServiceException(404, "Carpeta no encontrada");
+
+        if (folder.DeletedAt is null)
+            throw new ServiceException(404, "La carpeta no está en la papelera");
+
+        await EnsureTrashOwnerAsync(folder.RootFolderId, userId);
+
+        await DeleteFilesRecursivelyAsync(folder.Id);
+        folderRepository.Remove(folder); // cascade borra subcarpetas, FileEntity y FolderMember en la BD
+        await folderRepository.SaveChangesAsync();
+    }
+
+    public async Task PermanentlyDeleteFileAsync(Guid userId, Guid fileId)
+    {
+        var file = await fileRepository.GetByIdAsync(fileId)
+            ?? throw new ServiceException(404, "Archivo no encontrado");
+
+        if (file.DeletedAt is null)
+            throw new ServiceException(404, "El archivo no está en la papelera");
+
+        await EnsureTrashOwnerAsync(file.Folder.RootFolderId, userId);
+
+        fileStorage.Delete(file.StoragePath);
+        fileRepository.Remove(file);
+        await fileRepository.SaveChangesAsync();
+    }
+
+    public async Task EmptyTrashAsync(Guid userId)
+    {
+        var folders = await folderRepository.GetTrashedAsync(userId);
+        foreach (var folder in folders)
+        {
+            await DeleteFilesRecursivelyAsync(folder.Id);
+            folderRepository.Remove(folder);
+        }
+
+        var files = await fileRepository.GetTrashedAsync(userId);
+        foreach (var file in files)
+        {
+            fileStorage.Delete(file.StoragePath);
+            fileRepository.Remove(file);
+        }
+
+        await folderRepository.SaveChangesAsync();
+    }
+
+    private async Task EnsureTrashOwnerAsync(Guid rootFolderId, Guid userId)
+    {
+        var root = await folderRepository.GetByIdAsync(rootFolderId)
+            ?? throw new ServiceException(404, "Carpeta no encontrada");
+
+        if (root.OwnerId != userId)
+            throw new ServiceException(403, "No tienes acceso a la papelera de esta carpeta");
     }
 
     public async Task<FolderDto> RenameFolderAsync(Guid userId, Guid folderId, string newName)
@@ -363,8 +470,7 @@ public class FileService(
 
         await EnsureAccessAsync(file.Folder, userId, requireWrite: true);
 
-        fileStorage.Delete(file.StoragePath);
-        fileRepository.Remove(file);
+        file.DeletedAt = DateTime.UtcNow;
         await fileRepository.SaveChangesAsync();
     }
 

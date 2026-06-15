@@ -90,4 +90,43 @@ public class FilesController(IFileService fileService) : ApiControllerBase
 
         return ApiOk(await fileService.MoveFileAsync(User.GetUserId(), id, request.TargetFolderId.Value));
     }
+
+    [HttpGet("trash")]
+    public async Task<ActionResult<ApiResponse<TrashContentsDto>>> GetTrash() =>
+        ApiOk(await fileService.GetTrashAsync(User.GetUserId()));
+
+    [HttpPost("trash/folders/{id:guid}/restore")]
+    public async Task<IActionResult> RestoreFolder(Guid id)
+    {
+        await fileService.RestoreFolderAsync(User.GetUserId(), id);
+        return ApiOkEmpty();
+    }
+
+    [HttpPost("trash/files/{id:guid}/restore")]
+    public async Task<IActionResult> RestoreFile(Guid id)
+    {
+        await fileService.RestoreFileAsync(User.GetUserId(), id);
+        return ApiOkEmpty();
+    }
+
+    [HttpDelete("trash/folders/{id:guid}")]
+    public async Task<IActionResult> PermanentlyDeleteFolder(Guid id)
+    {
+        await fileService.PermanentlyDeleteFolderAsync(User.GetUserId(), id);
+        return ApiOkEmpty();
+    }
+
+    [HttpDelete("trash/files/{id:guid}")]
+    public async Task<IActionResult> PermanentlyDeleteFile(Guid id)
+    {
+        await fileService.PermanentlyDeleteFileAsync(User.GetUserId(), id);
+        return ApiOkEmpty();
+    }
+
+    [HttpDelete("trash")]
+    public async Task<IActionResult> EmptyTrash()
+    {
+        await fileService.EmptyTrashAsync(User.GetUserId());
+        return ApiOkEmpty();
+    }
 }

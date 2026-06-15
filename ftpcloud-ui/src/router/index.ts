@@ -10,6 +10,7 @@ import UsersView from '@/views/admin/UsersView.vue'
 import MyFilesView from '@/views/files/MyFilesView.vue'
 import SharedView from '@/views/files/SharedView.vue'
 import GroupsView from '@/views/files/GroupsView.vue'
+import TrashView from '@/views/files/TrashView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -36,6 +37,7 @@ const router = createRouter({
         { path: 'files', name: 'my-files', component: MyFilesView },
         { path: 'shared', name: 'shared', component: SharedView },
         { path: 'groups', name: 'groups', component: GroupsView },
+        { path: 'trash', name: 'trash', component: TrashView },
 
         // Solo admin y owner
         {

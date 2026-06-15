@@ -11,6 +11,7 @@ public class Folder
     public Guid? ParentFolderId { get; set; }
     public Guid RootFolderId { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime? DeletedAt { get; set; }
 
     public User Owner { get; set; } = null!;
     public Folder? ParentFolder { get; set; }

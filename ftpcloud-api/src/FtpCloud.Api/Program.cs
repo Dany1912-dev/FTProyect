@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using FtpCloud.Api.Common;
 using FtpCloud.Api.Middleware;
 using FtpCloud.Api.Seed;
+using FtpCloud.Api.Services;
 using FtpCloud.Application;
 using FtpCloud.Application.Common;
 using FtpCloud.Application.Services;
@@ -64,6 +65,12 @@ builder.Services.AddCors(options => options.AddPolicy("Frontend", policy => poli
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()
     .WithExposedHeaders("Location", "Upload-Offset", "Upload-Length", "Tus-Resumable", "Upload-Expires")));
 
+var tusTempPath = builder.Configuration["Storage:TusTempPath"] ?? "storage/tus-tmp";
+Directory.CreateDirectory(tusTempPath);
+var tusDiskStore = new TusDiskStore(tusTempPath);
+builder.Services.AddSingleton(tusDiskStore);
+builder.Services.AddHostedService<TusCleanupService>();
+
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
@@ -72,10 +79,6 @@ app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-
-var tusTempPath = builder.Configuration["Storage:TusTempPath"] ?? "storage/tus-tmp";
-Directory.CreateDirectory(tusTempPath);
-var tusDiskStore = new TusDiskStore(tusTempPath);
 
 app.MapTus("/api/files/tus", httpContext =>
 {

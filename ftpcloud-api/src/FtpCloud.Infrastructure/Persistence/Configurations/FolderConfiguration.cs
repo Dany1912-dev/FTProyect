@@ -17,6 +17,7 @@ public class FolderConfiguration : IEntityTypeConfiguration<Folder>
 
         b.Property(f => f.RootFolderId).IsRequired();
         b.HasIndex(f => f.RootFolderId);
+        b.HasIndex(f => f.DeletedAt);
 
         b.HasOne(f => f.Owner)
             .WithMany(u => u.OwnedFolders)

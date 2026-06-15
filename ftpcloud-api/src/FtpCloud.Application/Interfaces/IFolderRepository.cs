@@ -14,6 +14,8 @@ public interface IFolderRepository
     Task<List<Folder>> GetAncestorsAsync(Guid folderId);
     Task<List<Folder>> GetTreeByOwnerAsync(Guid ownerId);
     Task<List<Folder>> GetByRootIdAsync(Guid rootFolderId);
+    Task<List<Folder>> GetSubfoldersIncludingDeletedAsync(Guid parentFolderId);
+    Task<List<Folder>> GetTrashedAsync(Guid userId);
     Task<long> GetTotalSizeForOwnerAsync(Guid ownerId);
     Task<bool> NameExistsInFolderAsync(Guid? parentFolderId, Guid ownerId, FolderType type, string name, Guid? excludeId = null);
     Task<FolderMember?> GetMembershipAsync(Guid folderId, Guid userId);

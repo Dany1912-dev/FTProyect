@@ -9,7 +9,7 @@ public class FolderRepository(FtpCloudDbContext db) : IFolderRepository
 {
     public Task<List<Folder>> GetByOwnerAndTypeAsync(Guid ownerId, FolderType type) =>
         db.Folders.Include(f => f.Owner)
-            .Where(f => f.OwnerId == ownerId && f.Type == type && f.ParentFolderId == null)
+            .Where(f => f.OwnerId == ownerId && f.Type == type && f.ParentFolderId == null && f.DeletedAt == null)
             .OrderBy(f => f.Name).ToListAsync();
 
     public Task<List<Folder>> GetAllByOwnerAsync(Guid ownerId) =>
@@ -21,18 +21,18 @@ public class FolderRepository(FtpCloudDbContext db) : IFolderRepository
     public Task<List<Folder>> GetSharedWithUserAsync(Guid userId) =>
         db.Folders.Include(f => f.Owner)
             .Where(f => f.Type == FolderType.Personal && f.OwnerId != userId && f.ParentFolderId == null
-                        && f.Members.Any(m => m.UserId == userId))
+                        && f.DeletedAt == null && f.Members.Any(m => m.UserId == userId))
             .OrderBy(f => f.Name).ToListAsync();
 
     public Task<List<Folder>> GetGroupsForUserAsync(Guid userId) =>
         db.Folders.Include(f => f.Owner)
-            .Where(f => f.Type == FolderType.Group && f.ParentFolderId == null
+            .Where(f => f.Type == FolderType.Group && f.ParentFolderId == null && f.DeletedAt == null
                         && (f.OwnerId == userId || f.Members.Any(m => m.UserId == userId)))
             .OrderBy(f => f.Name).ToListAsync();
 
     public Task<List<Folder>> GetSubfoldersAsync(Guid parentFolderId) =>
         db.Folders.Include(f => f.Owner)
-            .Where(f => f.ParentFolderId == parentFolderId)
+            .Where(f => f.ParentFolderId == parentFolderId && f.DeletedAt == null)
             .OrderBy(f => f.Name).ToListAsync();
 
     public async Task<List<Folder>> GetAncestorsAsync(Guid folderId)
@@ -59,7 +59,19 @@ public class FolderRepository(FtpCloudDbContext db) : IFolderRepository
         db.Folders.Where(f => f.OwnerId == ownerId).ToListAsync();
 
     public Task<List<Folder>> GetByRootIdAsync(Guid rootFolderId) =>
-        db.Folders.Where(f => f.RootFolderId == rootFolderId).ToListAsync();
+        db.Folders.Where(f => f.RootFolderId == rootFolderId && f.DeletedAt == null).ToListAsync();
+
+    public Task<List<Folder>> GetSubfoldersIncludingDeletedAsync(Guid parentFolderId) =>
+        db.Folders.Where(f => f.ParentFolderId == parentFolderId).ToListAsync();
+
+    public Task<List<Folder>> GetTrashedAsync(Guid userId)
+    {
+        var rootIds = db.Folders.Where(r => r.OwnerId == userId && r.ParentFolderId == null).Select(r => r.Id);
+        return db.Folders.Include(f => f.Owner)
+            .Where(f => f.DeletedAt != null && rootIds.Contains(f.RootFolderId)
+                        && (f.ParentFolder == null || f.ParentFolder.DeletedAt == null))
+            .OrderBy(f => f.Name).ToListAsync();
+    }
 
     public async Task<long> GetTotalSizeForOwnerAsync(Guid ownerId) =>
         await db.Files.Where(f => f.Folder.OwnerId == ownerId).SumAsync(f => (long?)f.Size) ?? 0;

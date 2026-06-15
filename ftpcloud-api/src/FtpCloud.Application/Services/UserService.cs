@@ -63,12 +63,26 @@ public class UserService(
         var ownedFolders = await folderRepository.GetAllByOwnerAsync(id);
         foreach (var folder in ownedFolders)
         {
-            var files = await fileRepository.GetByFolderAsync(folder.Id);
+            var files = await fileRepository.GetByFolderIncludingDeletedAsync(folder.Id);
             foreach (var file in files)
                 fileStorage.Delete(file.StoragePath);
         }
 
         userRepository.Remove(user);
         await userRepository.SaveChangesAsync();
+    }
+
+    public async Task<UserDto> UpdateQuotaAsync(Guid id, long quotaBytes)
+    {
+        if (quotaBytes <= 0)
+            throw new ServiceException(400, "La cuota debe ser mayor a 0");
+
+        var user = await userRepository.GetByIdAsync(id)
+            ?? throw new ServiceException(404, "Usuario no encontrado");
+
+        user.StorageQuotaBytes = quotaBytes;
+        await userRepository.SaveChangesAsync();
+
+        return user.ToDto(await folderRepository.GetTotalSizeForOwnerAsync(user.Id));
     }
 }

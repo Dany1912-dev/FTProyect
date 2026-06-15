@@ -22,4 +22,10 @@ public interface IFileService
     Task DeleteFileAsync(Guid userId, Guid fileId);
     Task<FileItemDto> RenameFileAsync(Guid userId, Guid fileId, string newName);
     Task<FileItemDto> MoveFileAsync(Guid userId, Guid fileId, Guid targetFolderId);
+    Task<TrashContentsDto> GetTrashAsync(Guid userId);
+    Task RestoreFolderAsync(Guid userId, Guid folderId);
+    Task RestoreFileAsync(Guid userId, Guid fileId);
+    Task PermanentlyDeleteFolderAsync(Guid userId, Guid folderId);
+    Task PermanentlyDeleteFileAsync(Guid userId, Guid fileId);
+    Task EmptyTrashAsync(Guid userId);
 }

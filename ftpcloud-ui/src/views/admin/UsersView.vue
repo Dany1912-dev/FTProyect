@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useDialogStore } from '@/stores/dialog'
 import { api } from '@/services/api'
 import CreateUserModal from '@/components/users/CreateUserModal.vue'
+import EditQuotaModal from '@/components/users/EditQuotaModal.vue'
 import type { ApiResponse, User } from '@/types'
 
 const usersStore = useUsersStore()
@@ -12,6 +13,7 @@ const auth = useAuthStore()
 const dialog = useDialogStore()
 
 const showCreateModal = ref(false)
+const editingQuotaUser = ref<User | null>(null)
 
 onMounted(async () => {
   usersStore.setLoading(true)
@@ -35,6 +37,14 @@ function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
+}
+
+function onQuotaUpdated(user: User) {
+  usersStore.updateUser(user.id, {
+    storageQuotaBytes: user.storageQuotaBytes,
+    storageUsedBytes: user.storageUsedBytes,
+  })
+  editingQuotaUser.value = null
 }
 
 async function handleDelete(user: User) {
@@ -94,6 +104,13 @@ async function handleDelete(user: User) {
           <td class="td-date">{{ new Date(user.createdAt).toLocaleDateString() }}</td>
           <td v-if="auth.isOwner" class="td-actions">
             <button
+              class="action-btn"
+              :disabled="user.role === 'owner'"
+              @click="editingQuotaUser = user"
+            >
+              Cuota
+            </button>
+            <button
               class="action-btn danger"
               :disabled="user.role === 'owner'"
               @click="handleDelete(user)"
@@ -106,6 +123,13 @@ async function handleDelete(user: User) {
     </table>
 
     <CreateUserModal v-if="showCreateModal" @close="showCreateModal = false" @created="onCreated" />
+
+    <EditQuotaModal
+      v-if="editingQuotaUser"
+      :user="editingQuotaUser"
+      @close="editingQuotaUser = null"
+      @updated="onQuotaUpdated"
+    />
   </div>
 </template>
 

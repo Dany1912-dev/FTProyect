@@ -23,4 +23,8 @@ public class UsersController(IUserService userService) : ApiControllerBase
         await userService.DeleteAsync(id);
         return ApiOkEmpty();
     }
+
+    [HttpPut("{id}/quota"), Authorize(Roles = "Owner")]
+    public async Task<ActionResult<ApiResponse<UserDto>>> UpdateQuota(Guid id, UpdateQuotaRequest request) =>
+        ApiOk(await userService.UpdateQuotaAsync(id, request.QuotaBytes));
 }

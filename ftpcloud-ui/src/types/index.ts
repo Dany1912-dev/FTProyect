@@ -18,6 +18,7 @@ export interface Folder {
   ownerUsername: string
   parentFolderId: string | null
   createdAt: string
+  deletedAt: string | null
 }
 
 export interface FolderTreeNode {
@@ -34,6 +35,7 @@ export interface FileItem {
   folderId: string
   uploadedBy: string | null
   createdAt: string
+  deletedAt: string | null
 }
 
 export interface FolderMemberInfo {
@@ -48,6 +50,11 @@ export interface FolderContents {
   folders: Folder[]
   files: FileItem[]
   myRole?: 'owner' | 'editor' | 'viewer'
+}
+
+export interface TrashContents {
+  folders: Folder[]
+  files: FileItem[]
 }
 
 export interface ApiResponse<T> {

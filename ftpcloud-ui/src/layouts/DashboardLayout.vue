@@ -48,6 +48,7 @@ async function handleLogout() {
         <RouterLink to="/files" class="nav-item">Mis archivos</RouterLink>
         <RouterLink to="/shared" class="nav-item">Compartidos</RouterLink>
         <RouterLink to="/groups" class="nav-item">Grupos</RouterLink>
+        <RouterLink to="/trash" class="nav-item">Papelera</RouterLink>
 
         <template v-if="auth.isAdmin">
           <div class="nav-divider" />

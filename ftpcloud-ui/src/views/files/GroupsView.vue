@@ -63,7 +63,7 @@ async function handleDeleteGroup() {
 
   const confirmed = await dialog.confirm({
     title: 'Eliminar grupo',
-    message: `¿Eliminar el grupo "${folder.name}" y todo su contenido? Esta acción no se puede deshacer.`,
+    message: `¿Eliminar el grupo "${folder.name}" y todo su contenido? Se moverá a la papelera.`,
     confirmText: 'Eliminar',
     danger: true,
   })
@@ -147,7 +147,7 @@ async function onFileSelected(event: Event) {
 async function handleDeleteFile(file: FileItem) {
   const confirmed = await dialog.confirm({
     title: 'Eliminar archivo',
-    message: `¿Eliminar "${file.name}"? Esta acción no se puede deshacer.`,
+    message: `¿Eliminar "${file.name}"? Se moverá a la papelera.`,
     confirmText: 'Eliminar',
     danger: true,
   })

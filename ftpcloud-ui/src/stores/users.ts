@@ -18,6 +18,13 @@ export const useUsersStore = defineStore('users', () => {
     users.value = users.value.filter((u) => u.id !== id)
   }
 
+  function updateUser(id: string, updates: Partial<User>) {
+    const idx = users.value.findIndex((u) => u.id === id)
+    if (idx !== -1) {
+      users.value[idx] = { ...users.value[idx], ...updates } as User
+    }
+  }
+
   function setLoading(state: boolean) {
     isLoading.value = state
   }
@@ -28,6 +35,7 @@ export const useUsersStore = defineStore('users', () => {
     setUsers,
     addUser,
     removeUser,
+    updateUser,
     setLoading,
   }
 })
