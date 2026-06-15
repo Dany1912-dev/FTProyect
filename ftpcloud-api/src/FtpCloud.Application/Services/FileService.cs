@@ -36,7 +36,8 @@ public class FileService(
         if (folderId is null)
         {
             var shared = await folderRepository.GetSharedWithUserAsync(userId);
-            return new FolderContentsDto(null, [], shared.Select(f => f.ToDto()).ToList(), []);
+            var sharedFiles = await fileRepository.GetFilesSharedWithUserAsync(userId);
+            return new FolderContentsDto(null, [], shared.Select(f => f.ToDto()).ToList(), sharedFiles.Select(f => f.ToDto()).ToList());
         }
 
         var folder = await folderRepository.GetByIdAsync(folderId.Value)
@@ -605,6 +606,12 @@ public class FileService(
 
         fileRepository.RemoveFileShare(share);
         await fileRepository.SaveChangesAsync();
+    }
+
+    public async Task<List<UserSummaryDto>> GetShareableUsersAsync(Guid userId, string? query)
+    {
+        var users = await userRepository.SearchShareableUsersAsync(userId, query);
+        return users.Select(u => new UserSummaryDto(u.Id, u.Username)).ToList();
     }
 
     private async Task EnsureFileReadAccessAsync(FileEntity file, Guid userId)

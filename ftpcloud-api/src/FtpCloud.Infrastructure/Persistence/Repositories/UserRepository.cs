@@ -1,5 +1,6 @@
 using FtpCloud.Application.Interfaces;
 using FtpCloud.Domain.Entities;
+using FtpCloud.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace FtpCloud.Infrastructure.Persistence.Repositories;
@@ -14,6 +15,16 @@ public class UserRepository(FtpCloudDbContext db) : IUserRepository
 
     public Task<List<User>> GetAllAsync() =>
         db.Users.ToListAsync();
+
+    public Task<List<User>> SearchShareableUsersAsync(Guid excludeUserId, string? query, int maxResults = 20)
+    {
+        var users = db.Users.Where(u => u.Id != excludeUserId && u.Role != UserRole.Owner);
+
+        if (!string.IsNullOrWhiteSpace(query))
+            users = users.Where(u => EF.Functions.ILike(u.Username, $"%{query}%"));
+
+        return users.OrderBy(u => u.Username).Take(maxResults).ToListAsync();
+    }
 
     public Task<bool> UsernameOrEmailExistsAsync(string username, string email) =>
         db.Users.AnyAsync(u => u.Username == username || u.Email == email);

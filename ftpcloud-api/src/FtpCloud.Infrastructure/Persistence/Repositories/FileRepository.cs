@@ -36,6 +36,13 @@ public class FileRepository(FtpCloudDbContext db) : IFileRepository
             .OrderBy(fs => fs.User.Username)
             .ToListAsync();
 
+    public Task<List<FileEntity>> GetFilesSharedWithUserAsync(Guid userId) =>
+        db.FileShares
+            .Where(fs => fs.UserId == userId && fs.File.DeletedAt == null)
+            .Select(fs => fs.File)
+            .OrderBy(f => f.Name)
+            .ToListAsync();
+
     public Task<FileShareEntity?> GetFileShareAsync(Guid fileId, Guid userId) =>
         db.FileShares.FirstOrDefaultAsync(fs => fs.FileId == fileId && fs.UserId == userId);
 

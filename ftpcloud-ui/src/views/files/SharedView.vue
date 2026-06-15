@@ -3,21 +3,29 @@ import { ref, onMounted } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useDialogStore } from '@/stores/dialog'
 import { api, BASE_URL } from '@/services/api'
-import { startTusUpload } from '@/services/tus'
+import { useFileUpload } from '@/composables/useFileUpload'
 import type { ApiResponse, FolderContents, Folder, FileItem } from '@/types'
 import CreateFolderModal from '@/components/files/CreateFolderModal.vue'
 import RenameModal from '@/components/files/RenameModal.vue'
 import MoveModal from '@/components/files/MoveModal.vue'
+import FilePreviewModal from '@/components/files/FilePreviewModal.vue'
+import UploadQueue from '@/components/files/UploadQueue.vue'
 
 const filesStore = useFilesStore()
 const dialog = useDialogStore()
 
-const uploadProgress = ref<number | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+const isDragging = ref(false)
 const myRole = ref<'editor' | 'viewer' | null>(null)
 const showCreateFolder = ref(false)
 const renameTarget = ref<{ kind: 'folder' | 'file'; id: string; name: string } | null>(null)
 const moveTarget = ref<{ kind: 'folder' | 'file'; id: string; rootFolderId: string; excludeId?: string } | null>(null)
+const previewFile = ref<FileItem | null>(null)
+
+const { queue: uploadQueue, uploadFiles } = useFileUpload(
+  () => filesStore.currentFolder?.id,
+  () => load(filesStore.currentFolder?.id),
+)
 
 onMounted(() => load())
 
@@ -88,29 +96,29 @@ function triggerUpload() {
   fileInput.value?.click()
 }
 
-async function onFileSelected(event: Event) {
+function onFileSelected(event: Event) {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file || !filesStore.currentFolder) return
+  if (!input.files?.length) return
+  uploadFiles(input.files)
+  input.value = ''
+}
 
-  uploadProgress.value = 0
-  startTusUpload({
-    file,
-    folderId: filesStore.currentFolder.id,
-    onProgress: (percent) => {
-      uploadProgress.value = percent
-    },
-    onSuccess: async () => {
-      uploadProgress.value = null
-      input.value = ''
-      await load(filesStore.currentFolder!.id)
-    },
-    onError: async (message) => {
-      uploadProgress.value = null
-      input.value = ''
-      await dialog.alert({ title: 'Error', message })
-    },
-  })
+function onDragOver() {
+  if (filesStore.currentFolder && myRole.value === 'editor') isDragging.value = true
+}
+
+function onDragLeave() {
+  isDragging.value = false
+}
+
+function onDrop(event: DragEvent) {
+  isDragging.value = false
+  if (!filesStore.currentFolder || myRole.value !== 'editor' || !event.dataTransfer?.files.length) return
+  uploadFiles(event.dataTransfer.files)
+}
+
+function handlePreviewFile(file: FileItem) {
+  previewFile.value = file
 }
 
 async function handleDeleteFile(file: FileItem) {
@@ -164,11 +172,11 @@ function formatSize(bytes: number): string {
           <i class="ph ph-folder-plus"></i>
           <span class="btn-text">Nueva subcarpeta</span>
         </button>
-        <button class="btn btn-primary" :disabled="uploadProgress !== null" @click="triggerUpload">
-          <i :class="uploadProgress !== null ? 'ph ph-spinner-gap spin' : 'ph ph-upload-simple'"></i>
-          <span class="btn-text">{{ uploadProgress !== null ? `Subiendo... ${uploadProgress}%` : 'Subir archivo' }}</span>
+        <button class="btn btn-primary" @click="triggerUpload">
+          <i class="ph ph-upload-simple"></i>
+          <span class="btn-text">Subir archivos</span>
         </button>
-        <input ref="fileInput" type="file" class="hidden-input" @change="onFileSelected" />
+        <input ref="fileInput" type="file" multiple class="hidden-input" @change="onFileSelected" />
       </div>
     </div>
 
@@ -182,7 +190,14 @@ function formatSize(bytes: number): string {
       <p>Cargando archivos compartidos...</p>
     </div>
 
-    <div v-else class="content-area">
+    <div
+      v-else
+      class="content-area"
+      :class="{ 'drag-active': isDragging }"
+      @dragover.prevent="onDragOver"
+      @dragleave.prevent="onDragLeave"
+      @drop.prevent="onDrop"
+    >
       <div v-if="filesStore.folders.length" class="section">
         <div class="section-header">
           <h3 class="section-title">Carpetas</h3>
@@ -226,12 +241,15 @@ function formatSize(bytes: number): string {
             <div class="col-actions"></div>
           </div>
           <div v-for="file in filesStore.files" :key="file.id" class="file-row">
-            <div class="col-name">
+            <div class="col-name clickable" @click="handlePreviewFile(file)">
               <i class="ph ph-file-text file-icon"></i>
               <span class="file-name" :title="file.name">{{ file.name }}</span>
             </div>
             <div class="col-size">{{ formatSize(file.size) }}</div>
             <div class="col-actions file-actions">
+              <button class="icon-action-btn" @click="handlePreviewFile(file)" title="Vista previa">
+                <i class="ph ph-eye"></i>
+              </button>
               <a class="icon-action-btn" :href="`${BASE_URL}/files/${file.id}/download`" download title="Descargar">
                 <i class="ph ph-download-simple"></i>
               </a>
@@ -287,6 +305,14 @@ function formatSize(bytes: number): string {
       @close="moveTarget = null"
       @moved="onMoved"
     />
+
+    <FilePreviewModal
+      v-if="previewFile"
+      :file="previewFile"
+      @close="previewFile = null"
+    />
+
+    <UploadQueue :items="uploadQueue" />
   </div>
 </template>
 
@@ -602,6 +628,26 @@ function formatSize(bytes: number): string {
   align-items: center;
   gap: 0.75rem;
   min-width: 0;
+}
+
+.col-name.clickable {
+  cursor: pointer;
+}
+
+.col-name.clickable:hover .file-name {
+  color: var(--brand-primary);
+}
+
+.content-area {
+  border-radius: var(--radius-md);
+  transition: outline var(--transition-fast), background var(--transition-fast);
+  outline: 2px dashed transparent;
+  outline-offset: 4px;
+}
+
+.content-area.drag-active {
+  outline-color: var(--brand-primary);
+  background: var(--brand-primary-light);
 }
 
 .file-icon {

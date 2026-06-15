@@ -85,3 +85,8 @@ export interface FileShareInfo {
   username: string
   role: 'editor' | 'viewer'
 }
+
+export interface UserSummary {
+  id: string
+  username: string
+}

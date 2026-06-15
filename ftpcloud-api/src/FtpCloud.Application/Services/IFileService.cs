@@ -32,4 +32,5 @@ public interface IFileService
     Task<List<FileShareDto>> GetFileSharesAsync(Guid userId, Guid fileId);
     Task<FileShareDto> AddFileShareAsync(Guid userId, Guid fileId, string username, string role);
     Task RemoveFileShareAsync(Guid userId, Guid fileId, Guid targetUserId);
+    Task<List<UserSummaryDto>> GetShareableUsersAsync(Guid userId, string? query);
 }

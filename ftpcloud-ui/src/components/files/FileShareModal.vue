@@ -3,7 +3,9 @@ import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDialogStore } from '@/stores/dialog'
 import { api } from '@/services/api'
-import type { ApiResponse, FileItem, FileShareInfo } from '@/types'
+import { useUserSearch } from '@/composables/useUserSearch'
+import UserSearchDropdown from './UserSearchDropdown.vue'
+import type { ApiResponse, FileItem, FileShareInfo, UserSummary } from '@/types'
 
 const props = defineProps<{
   file: FileItem
@@ -19,11 +21,14 @@ const shares = ref<FileShareInfo[]>([])
 const isLoading = ref(true)
 const error = ref('')
 
-const newUsername = ref('')
 const isAdding = ref(false)
 
 const currentUserId = computed(() => auth.user!.id)
 const isOwner = computed(() => props.folderOwnerId === currentUserId.value)
+
+const {
+  searchQuery, filteredResults, isSearching, showDropdown, onSearchInput, onSearchBlur, reset: resetSearch,
+} = useUserSearch(() => shares.value.map((s) => s.userId))
 
 onMounted(load)
 
@@ -39,16 +44,16 @@ async function load() {
   }
 }
 
-async function handleAdd() {
+async function handleAdd(user: UserSummary) {
   error.value = ''
   isAdding.value = true
   try {
     const res = await api.post<ApiResponse<FileShareInfo>>(`/files/${props.file.id}/shares`, {
-      username: newUsername.value,
+      username: user.username,
       role: 'viewer',
     })
     shares.value.push(res.data)
-    newUsername.value = ''
+    resetSearch()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'No se pudo compartir el archivo'
   } finally {
@@ -127,24 +132,24 @@ async function handleRemove(share: FileShareInfo) {
       </div>
 
       <!-- Add form (owner only) -->
-      <form v-if="isOwner" @submit.prevent="handleAdd" class="add-form">
-        <div class="add-input-group">
-          <input
-            v-model="newUsername"
-            type="text"
-            placeholder="Nombre de usuario"
-            class="add-input"
-            required
-          />
-          <button type="submit" class="add-btn" :disabled="isAdding">
-            <i :class="isAdding ? 'ph ph-spinner-gap spin' : 'ph ph-plus'"></i>
-          </button>
-        </div>
+      <div v-if="isOwner" class="add-form">
+        <UserSearchDropdown
+          v-model="searchQuery"
+          :results="filteredResults"
+          :is-searching="isSearching"
+          :show-dropdown="showDropdown"
+          :disabled="isAdding"
+          placeholder="Buscar usuario..."
+          @input="onSearchInput"
+          @focus="onSearchInput"
+          @blur="onSearchBlur"
+          @select="handleAdd"
+        />
         <p v-if="error" class="error-msg">
           <i class="ph ph-warning-circle"></i>
           <span>{{ error }}</span>
         </p>
-      </form>
+      </div>
 
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" @click="$emit('close')">Cerrar</button>
@@ -348,50 +353,6 @@ async function handleRemove(share: FileShareInfo) {
 .add-form {
   border-top: 1px solid var(--color-border);
   padding-top: 1rem;
-}
-
-.add-input-group {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.add-input {
-  flex: 1;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-background);
-  color: var(--color-text);
-  font-size: 0.9rem;
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-
-.add-input:focus {
-  border-color: var(--brand-primary);
-}
-
-.add-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 0.75rem;
-  background: var(--brand-primary);
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: 1rem;
-  cursor: pointer;
-  transition: opacity var(--transition-fast);
-}
-
-.add-btn:hover:not(:disabled) {
-  opacity: 0.85;
-}
-
-.add-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .error-msg {

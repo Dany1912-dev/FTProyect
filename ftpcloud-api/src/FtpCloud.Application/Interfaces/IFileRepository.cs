@@ -11,6 +11,7 @@ public interface IFileRepository
     Task<List<FileEntity>> GetTrashedAsync(Guid userId);
     Task<List<FileShareEntity>> GetFileSharesAsync(Guid fileId);
     Task<FileShareEntity?> GetFileShareAsync(Guid fileId, Guid userId);
+    Task<List<FileEntity>> GetFilesSharedWithUserAsync(Guid userId);
     Task AddFileShareAsync(FileShareEntity share);
     void RemoveFileShare(FileShareEntity share);
     Task<List<FileEntity>> SearchFilesAsync(Guid userId, string query, int maxResults = 20);

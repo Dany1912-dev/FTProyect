@@ -3,7 +3,9 @@ import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDialogStore } from '@/stores/dialog'
 import { api } from '@/services/api'
-import type { ApiResponse, Folder, FolderMemberInfo } from '@/types'
+import { useUserSearch } from '@/composables/useUserSearch'
+import UserSearchDropdown from './UserSearchDropdown.vue'
+import type { ApiResponse, Folder, FolderMemberInfo, UserSummary } from '@/types'
 
 const props = defineProps<{ folder: Folder }>()
 
@@ -19,12 +21,15 @@ const members = ref<FolderMemberInfo[]>([])
 const isLoading = ref(true)
 const error = ref('')
 
-const newUsername = ref('')
 const newRole = ref<'editor' | 'viewer'>('editor')
 const isAdding = ref(false)
 
 const currentUserId = computed(() => auth.user!.id)
 const isOwner = computed(() => props.folder.ownerId === currentUserId.value)
+
+const {
+  searchQuery, filteredResults, isSearching, showDropdown, onSearchInput, onSearchBlur, reset: resetSearch,
+} = useUserSearch(() => members.value.map((m) => m.userId))
 
 onMounted(load)
 
@@ -40,16 +45,16 @@ async function load() {
   }
 }
 
-async function handleAdd() {
+async function handleAdd(user: UserSummary) {
   error.value = ''
   isAdding.value = true
   try {
     const res = await api.post<ApiResponse<FolderMemberInfo>>(`/files/folders/${props.folder.id}/members`, {
-      username: newUsername.value,
+      username: user.username,
       role: newRole.value,
     })
     members.value.push(res.data)
-    newUsername.value = ''
+    resetSearch()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'No se pudo agregar el usuario'
   } finally {
@@ -137,21 +142,23 @@ async function handleRemove(member: FolderMemberInfo) {
           </div>
         </div>
 
-        <form v-if="isOwner" class="add-form" @submit.prevent="handleAdd">
+        <div v-if="isOwner" class="add-form">
           <div class="form-group">
-            <label for="member-username">Invitar usuario</label>
+            <label>Invitar usuario</label>
             <div class="add-row">
-              <div class="input-wrapper">
-                <i class="ph ph-user"></i>
-                <input
-                  id="member-username"
-                  v-model="newUsername"
-                  type="text"
-                  placeholder="Nombre de usuario"
-                  autocomplete="off"
-                  required
-                />
-              </div>
+              <UserSearchDropdown
+                v-model="searchQuery"
+                :results="filteredResults"
+                :is-searching="isSearching"
+                :show-dropdown="showDropdown"
+                :disabled="isAdding"
+                placeholder="Buscar usuario..."
+                class="search-flex"
+                @input="onSearchInput"
+                @focus="onSearchInput"
+                @blur="onSearchBlur"
+                @select="handleAdd"
+              />
               <div class="select-wrapper">
                 <select v-model="newRole">
                   <option value="editor">Editor</option>
@@ -159,12 +166,9 @@ async function handleRemove(member: FolderMemberInfo) {
                 </select>
                 <i class="ph ph-caret-down"></i>
               </div>
-              <button type="submit" class="btn btn-primary btn-add" :disabled="isAdding || !newUsername.trim()">
-                <i :class="isAdding ? 'ph ph-spinner-gap spin' : 'ph ph-paper-plane-right'"></i>
-              </button>
             </div>
           </div>
-        </form>
+        </div>
       </template>
 
       <div v-if="error" class="error-msg">
@@ -441,35 +445,8 @@ async function handleRemove(member: FolderMemberInfo) {
   gap: 0.5rem;
 }
 
-.input-wrapper {
-  position: relative;
+.search-flex {
   flex: 1;
-}
-
-.input-wrapper i {
-  position: absolute;
-  left: 0.75rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--color-text-muted);
-}
-
-.input-wrapper input {
-  width: 100%;
-  padding: 0.7rem 0.75rem 0.7rem 2.25rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-background-soft);
-  color: var(--color-text);
-  font-size: 0.95rem;
-  outline: none;
-  transition: all var(--transition-fast);
-}
-
-.input-wrapper input:focus {
-  border-color: var(--brand-primary);
-  background: var(--color-background);
-  box-shadow: 0 0 0 3px var(--brand-primary-light);
 }
 
 .select-wrapper {
@@ -504,10 +481,6 @@ async function handleRemove(member: FolderMemberInfo) {
   transform: translateY(-50%);
   color: var(--color-text-muted);
   pointer-events: none;
-}
-
-.btn-add {
-  padding: 0 1rem;
 }
 
 .error-msg {

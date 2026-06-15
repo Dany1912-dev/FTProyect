@@ -71,6 +71,13 @@ public class FilesController(IFileService fileService) : ApiControllerBase
         return File(stream, mimeType, fileName);
     }
 
+    [HttpGet("{id:guid}/preview")]
+    public async Task<IActionResult> Preview(Guid id)
+    {
+        var (stream, _, mimeType) = await fileService.DownloadFileAsync(User.GetUserId(), id);
+        return File(stream, mimeType);
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteFile(Guid id)
     {
@@ -133,6 +140,10 @@ public class FilesController(IFileService fileService) : ApiControllerBase
     [HttpGet("search")]
     public async Task<ActionResult<ApiResponse<SearchResultsDto>>> Search([FromQuery] string q) =>
         ApiOk(await fileService.SearchAsync(User.GetUserId(), q));
+
+    [HttpGet("shareable-users")]
+    public async Task<ActionResult<ApiResponse<List<UserSummaryDto>>>> GetShareableUsers([FromQuery] string? q) =>
+        ApiOk(await fileService.GetShareableUsersAsync(User.GetUserId(), q));
 
     [HttpGet("{id:guid}/shares")]
     public async Task<ActionResult<ApiResponse<List<FileShareDto>>>> GetFileShares(Guid id) =>

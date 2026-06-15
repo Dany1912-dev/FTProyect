@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { api, BASE_URL } from '@/services/api'
 import { useDialogStore } from '@/stores/dialog'
 import type { ApiResponse, SearchResults, SearchResultItem } from '@/types'
+import FilePreviewModal from '@/components/files/FilePreviewModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,6 +14,7 @@ const items = ref<SearchResultItem[]>([])
 const query = ref('')
 const totalCount = ref(0)
 const isLoading = ref(false)
+const previewFile = ref<SearchResultItem | null>(null)
 
 onMounted(async () => {
   const q = route.query.q
@@ -42,6 +44,14 @@ function navigateToFolder(item: SearchResultItem) {
     : item.source === 'group' ? 'groups'
     : 'shared'
   router.push({ name: view, query: { folderId: item.id } })
+}
+
+function handleItemClick(item: SearchResultItem) {
+  if (item.kind === 'folder') {
+    navigateToFolder(item)
+  } else {
+    previewFile.value = item
+  }
 }
 
 function formatSize(bytes: number): string {
@@ -85,9 +95,8 @@ function sourceLabel(source: string): string {
       <div
         v-for="item in items"
         :key="`${item.kind}-${item.id}`"
-        class="result-row"
-        :class="{ clickable: item.kind === 'folder' }"
-        @click="item.kind === 'folder' && navigateToFolder(item)"
+        class="result-row clickable"
+        @click="handleItemClick(item)"
       >
         <div class="result-icon">
           <i v-if="item.kind === 'folder'" class="ph ph-folder"></i>
@@ -110,6 +119,12 @@ function sourceLabel(source: string): string {
         </a>
       </div>
     </div>
+
+    <FilePreviewModal
+      v-if="previewFile"
+      :file="{ id: previewFile.id, name: previewFile.name, size: previewFile.size ?? 0, mimeType: previewFile.mimeType ?? '' }"
+      @close="previewFile = null"
+    />
   </div>
 </template>
 
