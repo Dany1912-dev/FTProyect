@@ -61,3 +61,27 @@ export interface ApiResponse<T> {
   data: T
   message?: string
 }
+
+export interface SearchResultItem {
+  id: string
+  name: string
+  kind: 'file' | 'folder'
+  size: number | null
+  mimeType: string | null
+  parentId: string | null
+  parentName: string | null
+  ownerUsername: string
+  source: string
+}
+
+export interface SearchResults {
+  items: SearchResultItem[]
+  totalCount: number
+  query: string
+}
+
+export interface FileShareInfo {
+  userId: string
+  username: string
+  role: 'editor' | 'viewer'
+}

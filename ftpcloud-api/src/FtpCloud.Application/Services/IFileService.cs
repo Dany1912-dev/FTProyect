@@ -28,4 +28,8 @@ public interface IFileService
     Task PermanentlyDeleteFolderAsync(Guid userId, Guid folderId);
     Task PermanentlyDeleteFileAsync(Guid userId, Guid fileId);
     Task EmptyTrashAsync(Guid userId);
+    Task<SearchResultsDto> SearchAsync(Guid userId, string query);
+    Task<List<FileShareDto>> GetFileSharesAsync(Guid userId, Guid fileId);
+    Task<FileShareDto> AddFileShareAsync(Guid userId, Guid fileId, string username, string role);
+    Task RemoveFileShareAsync(Guid userId, Guid fileId, Guid targetUserId);
 }

@@ -129,4 +129,23 @@ public class FilesController(IFileService fileService) : ApiControllerBase
         await fileService.EmptyTrashAsync(User.GetUserId());
         return ApiOkEmpty();
     }
+
+    [HttpGet("search")]
+    public async Task<ActionResult<ApiResponse<SearchResultsDto>>> Search([FromQuery] string q) =>
+        ApiOk(await fileService.SearchAsync(User.GetUserId(), q));
+
+    [HttpGet("{id:guid}/shares")]
+    public async Task<ActionResult<ApiResponse<List<FileShareDto>>>> GetFileShares(Guid id) =>
+        ApiOk(await fileService.GetFileSharesAsync(User.GetUserId(), id));
+
+    [HttpPost("{id:guid}/shares")]
+    public async Task<ActionResult<ApiResponse<FileShareDto>>> AddFileShare(Guid id, AddFileShareRequest request) =>
+        ApiOk(await fileService.AddFileShareAsync(User.GetUserId(), id, request.Username, request.Role));
+
+    [HttpDelete("{id:guid}/shares/{targetUserId:guid}")]
+    public async Task<IActionResult> RemoveFileShare(Guid id, Guid targetUserId)
+    {
+        await fileService.RemoveFileShareAsync(User.GetUserId(), id, targetUserId);
+        return ApiOkEmpty();
+    }
 }

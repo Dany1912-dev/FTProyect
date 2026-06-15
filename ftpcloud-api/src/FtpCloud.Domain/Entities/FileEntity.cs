@@ -14,4 +14,5 @@ public class FileEntity
 
     public Folder Folder { get; set; } = null!;
     public User? UploadedBy { get; set; }
+    public ICollection<FileShare> FileShares { get; set; } = new List<FileShare>();
 }

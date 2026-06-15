@@ -73,6 +73,21 @@ public class FolderRepository(FtpCloudDbContext db) : IFolderRepository
             .OrderBy(f => f.Name).ToListAsync();
     }
 
+    public Task<List<Folder>> SearchFoldersAsync(Guid userId, string query, int maxResults = 20)
+    {
+        var pattern = $"%{query}%";
+        return db.Folders.Include(f => f.Owner)
+            .Where(f => f.DeletedAt == null
+                && EF.Functions.ILike(f.Name, pattern)
+                && (
+                    f.OwnerId == userId
+                    || db.FolderMembers.Any(fm => fm.FolderId == f.RootFolderId && fm.UserId == userId)
+                ))
+            .OrderBy(f => f.Name)
+            .Take(maxResults)
+            .ToListAsync();
+    }
+
     public async Task<long> GetTotalSizeForOwnerAsync(Guid ownerId) =>
         await db.Files.Where(f => f.Folder.OwnerId == ownerId).SumAsync(f => (long?)f.Size) ?? 0;
 

@@ -1,5 +1,6 @@
 using FtpCloud.Application.Dtos;
 using FtpCloud.Domain.Entities;
+using FileShareEntity = FtpCloud.Domain.Entities.FileShare;
 
 namespace FtpCloud.Application.Mapping;
 
@@ -16,4 +17,7 @@ public static class FileMappingExtensions
 
     public static FolderMemberDto ToDto(this FolderMember member) =>
         new(member.UserId, member.User.Username, member.Role.ToString().ToLowerInvariant());
+
+    public static FileShareDto ToDto(this FileShareEntity share) =>
+        new(share.UserId, share.User.Username, share.Role.ToString().ToLowerInvariant());
 }

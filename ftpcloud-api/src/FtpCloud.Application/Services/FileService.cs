@@ -4,6 +4,7 @@ using FtpCloud.Application.Interfaces;
 using FtpCloud.Application.Mapping;
 using FtpCloud.Domain.Entities;
 using FtpCloud.Domain.Enums;
+using FileShareEntity = FtpCloud.Domain.Entities.FileShare;
 
 namespace FtpCloud.Application.Services;
 
@@ -458,7 +459,7 @@ public class FileService(
         var file = await fileRepository.GetByIdAsync(fileId)
             ?? throw new ServiceException(404, "Archivo no encontrado");
 
-        await EnsureAccessAsync(file.Folder, userId, requireWrite: false);
+        await EnsureFileReadAccessAsync(file, userId);
 
         return (fileStorage.OpenRead(file.StoragePath), file.Name, file.MimeType ?? "application/octet-stream");
     }
@@ -508,6 +509,116 @@ public class FileService(
         file.FolderId = target.Id;
         await fileRepository.SaveChangesAsync();
         return file.ToDto();
+    }
+
+    public async Task<SearchResultsDto> SearchAsync(Guid userId, string query)
+    {
+        query = query.Trim();
+        if (string.IsNullOrWhiteSpace(query))
+            return new SearchResultsDto([], 0, query);
+
+        var folders = await folderRepository.SearchFoldersAsync(userId, query);
+        var files = await fileRepository.SearchFilesAsync(userId, query);
+
+        var items = new List<SearchResultItemDto>();
+
+        foreach (var folder in folders)
+        {
+            var source = folder.Type == FolderType.Group ? "group"
+                : folder.OwnerId == userId ? "own"
+                : "shared";
+            items.Add(new SearchResultItemDto(
+                folder.Id, folder.Name, "folder", null, null,
+                folder.ParentFolderId, null,
+                folder.Owner.Username, source));
+        }
+
+        foreach (var file in files)
+        {
+            var hasDirectShare = await fileRepository.GetFileShareAsync(file.Id, userId) is not null;
+            var source = hasDirectShare ? "file_share"
+                : file.Folder.Type == FolderType.Group ? "group"
+                : file.Folder.OwnerId == userId ? "own"
+                : "shared";
+            items.Add(new SearchResultItemDto(
+                file.Id, file.Name, "file", file.Size, file.MimeType,
+                file.FolderId, file.Folder.Name,
+                file.Folder.Owner.Username, source));
+        }
+
+        return new SearchResultsDto(
+            items.OrderBy(i => i.Name).ToList(),
+            items.Count,
+            query);
+    }
+
+    public async Task<List<FileShareDto>> GetFileSharesAsync(Guid userId, Guid fileId)
+    {
+        var file = await fileRepository.GetByIdAsync(fileId)
+            ?? throw new ServiceException(404, "Archivo no encontrado");
+
+        if (file.Folder.OwnerId != userId)
+            throw new ServiceException(403, "Solo el dueño puede ver los compartidos de este archivo");
+
+        var shares = await fileRepository.GetFileSharesAsync(fileId);
+        return shares.Select(s => s.ToDto()).ToList();
+    }
+
+    public async Task<FileShareDto> AddFileShareAsync(Guid userId, Guid fileId, string username, string role)
+    {
+        var file = await fileRepository.GetByIdAsync(fileId)
+            ?? throw new ServiceException(404, "Archivo no encontrado");
+
+        if (file.Folder.OwnerId != userId)
+            throw new ServiceException(403, "Solo el dueño puede compartir este archivo");
+
+        if (!Enum.TryParse<FolderMemberRole>(role, true, out var parsedRole) || parsedRole != FolderMemberRole.Viewer)
+            throw new ServiceException(400, "Rol inválido. Solo se permite 'viewer' para archivos");
+
+        var target = await userRepository.GetByUsernameAsync(username.Trim())
+            ?? throw new ServiceException(404, "Usuario no encontrado");
+
+        if (target.Id == file.Folder.OwnerId)
+            throw new ServiceException(400, "No puedes compartir el archivo contigo mismo");
+
+        if (await fileRepository.GetFileShareAsync(fileId, target.Id) is not null)
+            throw new ServiceException(409, "Ese usuario ya tiene acceso a este archivo");
+
+        var share = new FileShareEntity { FileId = fileId, UserId = target.Id, Role = parsedRole };
+        await fileRepository.AddFileShareAsync(share);
+        await fileRepository.SaveChangesAsync();
+
+        share.User = target;
+        return share.ToDto();
+    }
+
+    public async Task RemoveFileShareAsync(Guid userId, Guid fileId, Guid targetUserId)
+    {
+        var file = await fileRepository.GetByIdAsync(fileId)
+            ?? throw new ServiceException(404, "Archivo no encontrado");
+
+        if (file.Folder.OwnerId != userId && userId != targetUserId)
+            throw new ServiceException(403, "No tienes permiso para hacer esto");
+
+        var share = await fileRepository.GetFileShareAsync(fileId, targetUserId)
+            ?? throw new ServiceException(404, "El usuario no tiene acceso a este archivo");
+
+        fileRepository.RemoveFileShare(share);
+        await fileRepository.SaveChangesAsync();
+    }
+
+    private async Task EnsureFileReadAccessAsync(FileEntity file, Guid userId)
+    {
+        try
+        {
+            await EnsureAccessAsync(file.Folder, userId, requireWrite: false);
+            return;
+        }
+        catch (ServiceException) { }
+
+        var share = await fileRepository.GetFileShareAsync(file.Id, userId);
+        if (share is null)
+            throw new ServiceException(403, "No tienes acceso a este archivo");
     }
 
     private async Task EnsureAccessAsync(Folder folder, Guid userId, bool requireWrite)

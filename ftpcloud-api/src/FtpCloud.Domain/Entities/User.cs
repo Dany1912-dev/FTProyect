@@ -16,4 +16,5 @@ public class User
     public ICollection<Folder> OwnedFolders { get; set; } = new List<Folder>();
     public ICollection<FolderMember> FolderMemberships { get; set; } = new List<FolderMember>();
     public ICollection<FileEntity> UploadedFiles { get; set; } = new List<FileEntity>();
+    public ICollection<FileShare> FileShares { get; set; } = new List<FileShare>();
 }

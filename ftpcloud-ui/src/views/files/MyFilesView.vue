@@ -9,6 +9,7 @@ import CreateFolderModal from '@/components/files/CreateFolderModal.vue'
 import FolderMembersModal from '@/components/files/FolderMembersModal.vue'
 import RenameModal from '@/components/files/RenameModal.vue'
 import MoveModal from '@/components/files/MoveModal.vue'
+import FileShareModal from '@/components/files/FileShareModal.vue'
 
 const filesStore = useFilesStore()
 const dialog = useDialogStore()
@@ -19,6 +20,7 @@ const uploadProgress = ref<number | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const renameTarget = ref<{ kind: 'folder' | 'file'; id: string; name: string } | null>(null)
 const moveTarget = ref<{ kind: 'folder' | 'file'; id: string; rootFolderId: string; excludeId?: string } | null>(null)
+const showFileShare = ref<{ file: FileItem; folderOwnerId: string } | null>(null)
 
 onMounted(() => load())
 
@@ -154,6 +156,11 @@ async function handleDeleteFile(file: FileItem) {
   }
 }
 
+function handleShareFile(file: FileItem) {
+  const ownerId = filesStore.path[0]?.ownerId ?? filesStore.currentFolder!.ownerId
+  showFileShare.value = { file, folderOwnerId: ownerId }
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -265,6 +272,9 @@ function formatSize(bytes: number): string {
               <button class="icon-action-btn" @click="handleMoveFile(file)" title="Mover">
                 <i class="ph ph-folder-notch-open"></i>
               </button>
+              <button class="icon-action-btn" @click="handleShareFile(file)" title="Compartir">
+                <i class="ph ph-share-network"></i>
+              </button>
               <button class="icon-action-btn danger" @click="handleDeleteFile(file)" title="Eliminar">
                 <i class="ph ph-trash"></i>
               </button>
@@ -295,6 +305,13 @@ function formatSize(bytes: number): string {
       v-if="showMembers && filesStore.currentFolder"
       :folder="filesStore.currentFolder"
       @close="showMembers = false"
+    />
+
+    <FileShareModal
+      v-if="showFileShare"
+      :file="showFileShare.file"
+      :folder-owner-id="showFileShare.folderOwnerId"
+      @close="showFileShare = null"
     />
 
     <RenameModal

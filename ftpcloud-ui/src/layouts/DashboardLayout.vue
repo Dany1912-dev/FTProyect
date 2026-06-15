@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/api'
 import ChangePasswordModal from '@/components/common/ChangePasswordModal.vue'
+import SearchBar from '@/components/files/SearchBar.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -25,6 +26,10 @@ function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
+}
+
+function onSearch(query: string) {
+  router.push({ name: 'search', query: { q: query } })
 }
 
 async function handleLogout() {
@@ -50,6 +55,8 @@ async function handleLogout() {
       </div>
 
       <nav class="sidebar-nav">
+        <SearchBar @search="onSearch" />
+
         <div class="nav-section">
           <span class="nav-label">Mi espacio</span>
           <RouterLink to="/files" class="nav-item">
