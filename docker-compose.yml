@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./ftpcloud-api
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=db;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      Jwt__SigningKey: ${JWT_SIGNING_KEY}
+      Cors__AllowedOrigin: ${FRONTEND_ORIGIN}
+      Seed__OwnerUsername: ${SEED_OWNER_USERNAME}
+      Seed__OwnerEmail: ${SEED_OWNER_EMAIL}
+      Seed__OwnerPassword: ${SEED_OWNER_PASSWORD}
+    volumes:
+      - storage-data:/app/storage
+    ports:
+      - "5000:8080"
+
+  ui:
+    build:
+      context: ./ftpcloud-ui
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - api
+      - ui
+
+volumes:
+  db-data:
+  storage-data:

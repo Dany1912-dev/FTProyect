@@ -12,6 +12,7 @@ using FtpCloud.Infrastructure;
 using FtpCloud.Infrastructure.Persistence;
 using FtpCloud.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -74,6 +75,18 @@ builder.Services.AddHostedService<TusCleanupService>();
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+// Detrás de Cloudflare Tunnel, TLS termina en el edge y el contenedor recibe HTTP plano.
+// ForwardedHeaders permite que UseHttpsRedirection y Request.IsHttps respeten X-Forwarded-Proto.
+var forwardedHeadersOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor,
+};
+// El contenedor solo es alcanzable desde cloudflared dentro de la red de docker compose,
+// así que confiamos en cualquier proxy en lugar de listar IPs internas fijas.
+forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
 app.UseHttpsRedirection();
 app.UseCors("Frontend");
 app.UseAuthentication();
