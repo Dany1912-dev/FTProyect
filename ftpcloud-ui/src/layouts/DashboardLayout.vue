@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/api'
@@ -10,10 +10,23 @@ const auth = useAuthStore()
 const router = useRouter()
 
 const showChangePassword = ref(false)
+const showMobileMenu = ref(false)
 
 onMounted(() => {
   if (!auth.isOwner) auth.restoreSession()
+  window.addEventListener('click', closeMobileMenu)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('click', closeMobileMenu)
+})
+
+function closeMobileMenu(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  if (!target.closest('.mobile-actions')) {
+    showMobileMenu.value = false
+  }
+}
 
 const usagePercent = computed(() => {
   const user = auth.user
@@ -34,10 +47,8 @@ function onSearch(query: string) {
 
 async function handleLogout() {
   try {
-    // El backend borra las cookies HttpOnly desde el servidor
     await api.post('/auth/logout')
   } finally {
-    // Siempre limpiar estado local y redirigir, haya o no error
     auth.clearUser()
     router.push('/login')
   }
@@ -46,6 +57,51 @@ async function handleLogout() {
 
 <template>
   <div class="dashboard-layout">
+    
+    <!-- Mobile Header -->
+    <header class="mobile-header">
+      <div class="mobile-header-top">
+        <div class="logo-container">
+          <i class="ph ph-cloud logo-icon"></i>
+          <span class="sidebar-logo">FTPCloud</span>
+        </div>
+        
+        <div class="mobile-actions">
+          <button class="mobile-avatar-btn" @click.stop="showMobileMenu = !showMobileMenu">
+            <div class="avatar" :class="auth.user?.role">{{ auth.user?.username.charAt(0).toUpperCase() }}</div>
+          </button>
+          
+          <div v-if="showMobileMenu" class="mobile-dropdown">
+            <div class="mobile-dropdown-header">
+              <span class="sidebar-username">{{ auth.user?.username }}</span>
+              <span class="sidebar-role">{{ auth.user?.role }}</span>
+            </div>
+            <div class="mobile-dropdown-divider"></div>
+            
+            <div v-if="!auth.isOwner && auth.user" class="mobile-usage-info">
+              <div class="usage-header">
+                <span>Almacenamiento</span>
+                <span>{{ Math.round(usagePercent) }}%</span>
+              </div>
+              <div class="usage-bar">
+                <div class="usage-fill" :style="{ width: `${usagePercent}%`, backgroundColor: usagePercent > 90 ? 'var(--color-danger)' : 'var(--brand-primary)' }" />
+              </div>
+            </div>
+            
+            <button class="dropdown-item" @click="showChangePassword = true; showMobileMenu = false">
+              <i class="ph ph-key"></i> Cambiar contraseña
+            </button>
+            <button class="dropdown-item danger" @click="handleLogout">
+              <i class="ph ph-sign-out"></i> Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="mobile-header-search">
+        <SearchBar @search="onSearch" />
+      </div>
+    </header>
+
     <aside class="sidebar">
       <div class="sidebar-header">
         <div class="logo-container">
@@ -55,25 +111,27 @@ async function handleLogout() {
       </div>
 
       <nav class="sidebar-nav">
-        <SearchBar @search="onSearch" />
+        <div class="desktop-search">
+          <SearchBar @search="onSearch" />
+        </div>
 
         <div class="nav-section">
           <span class="nav-label">Mi espacio</span>
           <RouterLink to="/files" class="nav-item">
             <i class="ph ph-folder"></i>
-            <span>Mis archivos</span>
+            <span class="nav-text">Mis archivos</span>
           </RouterLink>
           <RouterLink to="/shared" class="nav-item">
             <i class="ph ph-users"></i>
-            <span>Compartidos</span>
+            <span class="nav-text">Compartidos</span>
           </RouterLink>
           <RouterLink to="/groups" class="nav-item">
             <i class="ph ph-users-three"></i>
-            <span>Grupos</span>
+            <span class="nav-text">Grupos</span>
           </RouterLink>
           <RouterLink to="/trash" class="nav-item">
             <i class="ph ph-trash"></i>
-            <span>Papelera</span>
+            <span class="nav-text">Papelera</span>
           </RouterLink>
         </div>
 
@@ -83,11 +141,11 @@ async function handleLogout() {
             <span class="nav-label">Administración</span>
             <RouterLink v-if="auth.isAdmin" to="/users" class="nav-item">
               <i class="ph ph-user-gear"></i>
-              <span>Usuarios</span>
+              <span class="nav-text">Usuarios</span>
             </RouterLink>
             <RouterLink v-if="auth.isOwner" to="/owner" class="nav-item">
               <i class="ph ph-shield-star"></i>
-              <span>Panel Owner</span>
+              <span class="nav-text">Owner</span>
             </RouterLink>
           </div>
         </template>
@@ -108,7 +166,7 @@ async function handleLogout() {
         </div>
         
         <div class="user-profile">
-          <div class="avatar">
+          <div class="avatar" :class="auth.user?.role">
             {{ auth.user?.username.charAt(0).toUpperCase() }}
           </div>
           <div class="user-info">
@@ -143,6 +201,10 @@ async function handleLogout() {
   display: flex;
   min-height: 100vh;
   background-color: var(--color-background-mute);
+}
+
+.mobile-header {
+  display: none;
 }
 
 .sidebar {
@@ -191,6 +253,10 @@ async function handleLogout() {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+
+.desktop-search {
+  margin-bottom: 1rem;
 }
 
 .nav-label {
@@ -320,6 +386,11 @@ async function handleLogout() {
   box-shadow: var(--shadow-sm);
 }
 
+.avatar.owner { background: linear-gradient(135deg, var(--color-danger), #991b1b); }
+.avatar.admin { background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-hover)); }
+.avatar.user { background: linear-gradient(135deg, #6b7280, #4b5563); }
+
+
 .user-info {
   display: flex;
   flex-direction: column;
@@ -382,5 +453,184 @@ async function handleLogout() {
   padding: 2rem 3rem;
   max-width: 1400px;
   margin: 0 auto;
+}
+
+/* RESPONSIVE DESIGN (MOBILE) */
+@media (max-width: 768px) {
+  .dashboard-layout {
+    flex-direction: column;
+  }
+  
+  .mobile-header {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    z-index: 40;
+  }
+
+  .mobile-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .mobile-actions {
+    position: relative;
+  }
+  
+  .mobile-avatar-btn {
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    border-radius: 50%;
+  }
+
+  .mobile-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.5rem;
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    min-width: 220px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 0;
+    animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transform-origin: top right;
+  }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .mobile-dropdown-header {
+    padding: 0.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobile-dropdown-divider {
+    height: 1px;
+    background: var(--color-border);
+    margin: 0.25rem 0;
+  }
+  
+  .mobile-usage-info {
+    padding: 0.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border: none;
+    background: transparent;
+    color: var(--color-text);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: all var(--transition-fast);
+  }
+
+  .dropdown-item i { font-size: 1.1rem; color: var(--color-text-muted); }
+  .dropdown-item:hover { background: var(--color-background-mute); color: var(--color-heading); }
+  .dropdown-item:hover i { color: var(--color-heading); }
+  .dropdown-item.danger { color: var(--color-danger); }
+  .dropdown-item.danger i { color: var(--color-danger); }
+  .dropdown-item.danger:hover { background: var(--color-danger-bg); }
+
+  /* Transform Sidebar to Bottom Nav */
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    flex-direction: row;
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    border-right: none;
+    border-top: 1px solid var(--color-border);
+    padding: 0.25rem 0.5rem;
+    z-index: 40;
+    box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.05);
+    padding-bottom: env(safe-area-inset-bottom, 0.25rem);
+  }
+
+  .sidebar-header, .sidebar-footer, .desktop-search, .nav-label, .nav-divider {
+    display: none;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0;
+    width: 100%;
+    overflow: visible;
+  }
+
+  .nav-section {
+    display: contents; 
+  }
+
+  .nav-item {
+    flex-direction: column;
+    padding: 0.5rem;
+    gap: 0.2rem;
+    border-radius: var(--radius-lg);
+    background: transparent;
+  }
+
+  .nav-item i {
+    font-size: 1.5rem;
+  }
+
+  .nav-text {
+    display: none; /* Hide text on mobile */
+  }
+
+  .nav-item:hover {
+    background: transparent;
+  }
+
+  .nav-item.router-link-active {
+    background: transparent;
+  }
+  
+  .nav-item.router-link-active i {
+    transform: translateY(-2px) scale(1.1);
+    filter: drop-shadow(0 2px 4px var(--brand-primary-light));
+  }
+
+  /* Adjust main content so it doesn't get hidden behind bottom nav */
+  .main-content {
+    padding-bottom: 80px; 
+  }
+  
+  .content-wrapper {
+    padding: 1.25rem 1rem; 
+  }
 }
 </style>
