@@ -27,6 +27,18 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
 }
 
+function decreaseQuota() {
+  const current = Number(gbInput.value) || 0;
+  if (current > 0.1) {
+    gbInput.value = parseFloat((current - 0.1).toFixed(1));
+  }
+}
+
+function increaseQuota() {
+  const current = Number(gbInput.value) || 0;
+  gbInput.value = parseFloat((current + 0.1).toFixed(1));
+}
+
 async function handleSubmit() {
   error.value = ''
 
@@ -59,33 +71,66 @@ async function handleSubmit() {
 <template>
   <div class="overlay" @click.self="$emit('close')">
     <div class="modal">
-      <h3 class="modal-title">Editar cuota — {{ user.username }}</h3>
+      <div class="modal-header">
+        <div class="modal-title-wrapper">
+          <i class="ph ph-hard-drives title-icon"></i>
+          <h3 class="modal-title">Editar cuota</h3>
+        </div>
+        <button class="close-btn" @click="$emit('close')">
+          <i class="ph ph-x"></i>
+        </button>
+      </div>
 
       <form @submit.prevent="handleSubmit" class="modal-form">
-        <p class="usage-info">
-          Uso actual: <strong>{{ formatSize(user.storageUsedBytes) }}</strong>
-          ({{ currentUsageGB }} GB)
-        </p>
-
-        <div class="form-group">
-          <label for="quota-gb">Cuota (GB)</label>
-          <input
-            id="quota-gb"
-            v-model.number="gbInput"
-            type="number"
-            min="0.1"
-            step="0.1"
-            autofocus
-            required
-          />
+        <div class="user-subtitle">
+          <div class="user-avatar">{{ user.username.charAt(0).toUpperCase() }}</div>
+          <span>{{ user.username }}</span>
         </div>
 
-        <p v-if="error" class="error-msg">{{ error }}</p>
+        <div class="usage-card">
+          <div class="usage-header">
+            <span>Uso actual</span>
+            <strong>{{ formatSize(user.storageUsedBytes) }} ({{ currentUsageGB }} GB)</strong>
+          </div>
+          <div class="usage-bar-bg">
+            <div class="usage-fill" :style="{ width: Math.min(100, (user.storageUsedBytes / (gbInput * 1024 * 1024 * 1024)) * 100) + '%' }"></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="quota-gb">Límite de cuota (GB)</label>
+          <div class="number-input-wrapper">
+            <button type="button" class="stepper-btn" @click="decreaseQuota" :disabled="gbInput <= 0.1">
+              <i class="ph ph-minus"></i>
+            </button>
+            <div class="input-container">
+              <input
+                id="quota-gb"
+                v-model.number="gbInput"
+                type="number"
+                min="0.1"
+                step="0.1"
+                autofocus
+                required
+              />
+              <span class="unit">GB</span>
+            </div>
+            <button type="button" class="stepper-btn" @click="increaseQuota">
+              <i class="ph ph-plus"></i>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="error" class="error-msg">
+          <i class="ph ph-warning-circle"></i>
+          <span>{{ error }}</span>
+        </div>
 
         <div class="modal-actions">
-          <button type="button" class="btn-cancel" @click="$emit('close')">Cancelar</button>
-          <button type="submit" class="btn-submit" :disabled="isSubmitting">
-            {{ isSubmitting ? 'Guardando...' : 'Guardar' }}
+          <button type="button" class="btn btn-secondary" @click="$emit('close')">Cancelar</button>
+          <button type="submit" class="btn btn-primary" :disabled="isSubmitting">
+            <i :class="isSubmitting ? 'ph ph-spinner-gap spin' : 'ph ph-check'"></i>
+            <span>{{ isSubmitting ? 'Guardando...' : 'Guardar cambios' }}</span>
           </button>
         </div>
       </form>
@@ -97,109 +142,312 @@ async function handleSubmit() {
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modal {
   background: var(--color-background);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 1.5rem;
   width: 100%;
-  max-width: 380px;
+  max-width: 400px;
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.modal-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.title-icon {
+  font-size: 1.5rem;
+  color: var(--brand-primary);
 }
 
 .modal-title {
   font-size: 1.25rem;
   font-weight: 700;
-  margin: 0 0 1.25rem;
+  margin: 0;
+  color: var(--color-heading);
+}
+
+.close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.close-btn:hover {
+  background: var(--color-background-mute);
   color: var(--color-heading);
 }
 
 .modal-form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
-.usage-info {
-  margin: 0;
+.user-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-background-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  color: var(--color-heading);
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+}
+
+.usage-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--color-background-mute);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+}
+
+.usage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 0.875rem;
   color: var(--color-text);
+}
+
+.usage-header strong {
+  color: var(--color-heading);
+}
+
+.usage-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.usage-fill {
+  height: 100%;
+  background: var(--brand-primary);
+  border-radius: 4px;
+  transition: width 0.3s ease;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
 .form-group label {
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-heading);
 }
 
-.form-group input {
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-background);
-  color: var(--color-text);
-  font-size: 0.95rem;
-  outline: none;
-  transition: border-color 0.15s;
+.number-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.form-group input:focus {
-  border-color: var(--color-heading);
+.stepper-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-background-soft);
+  color: var(--color-text);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.stepper-btn:hover:not(:disabled) {
+  background: var(--color-background-mute);
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+}
+
+.stepper-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.input-container {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.input-container input {
+  width: 100%;
+  padding: 0.75rem 3rem 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background-soft);
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 500;
+  outline: none;
+  text-align: center;
+  transition: all var(--transition-fast);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Hide default spin buttons */
+.input-container input[type="number"]::-webkit-inner-spin-button,
+.input-container input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.input-container input[type="number"] {
+  -moz-appearance: textfield; /* Firefox */
+}
+
+.input-container input:focus {
+  border-color: var(--brand-primary);
+  background: var(--color-background);
+  box-shadow: 0 0 0 3px var(--brand-primary-light);
+}
+
+.unit {
+  position: absolute;
+  right: 1rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+  pointer-events: none;
 }
 
 .error-msg {
-  color: #e05252;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
   font-size: 0.875rem;
   margin: 0;
+}
+
+.error-msg i {
+  font-size: 1.1rem;
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.25rem;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
 }
 
-.btn-cancel,
-.btn-submit {
-  padding: 0.6rem 1.1rem;
-  border: none;
-  border-radius: 6px;
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--radius-md);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
 }
 
-.btn-cancel {
+.btn-secondary {
   background: var(--color-background-mute);
   color: var(--color-text);
+  border-color: var(--color-border);
 }
 
-.btn-submit {
-  background: var(--color-heading);
-  color: var(--color-background);
+.btn-secondary:hover {
+  background: var(--color-border);
+  color: var(--color-heading);
 }
 
-.btn-cancel:hover,
-.btn-submit:hover:not(:disabled) {
-  opacity: 0.85;
+.btn-primary {
+  background: var(--brand-primary);
+  color: white;
+  box-shadow: var(--shadow-sm);
 }
 
-.btn-submit:disabled {
-  opacity: 0.5;
+.btn-primary:hover:not(:disabled) {
+  background: var(--brand-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>

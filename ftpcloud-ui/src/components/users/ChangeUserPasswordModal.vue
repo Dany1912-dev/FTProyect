@@ -1,32 +1,38 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { api } from '@/services/api'
-import type { ApiResponse, Folder, FileItem } from '@/types'
+import type { User, ApiResponse } from '@/types'
 
 const props = defineProps<{
-  kind: 'folder' | 'file'
-  id: string
-  currentName: string
+  user: User
 }>()
 
 const emit = defineEmits<{
   close: []
-  renamed: [item: Folder | FileItem]
+  updated: [user: User]
 }>()
 
-const name = ref(props.currentName)
+const newPassword = ref('')
+const confirmPassword = ref('')
 const error = ref('')
 const isSubmitting = ref(false)
 
 async function handleSubmit() {
   error.value = ''
+
+  if (newPassword.value !== confirmPassword.value) {
+    error.value = 'Las contraseñas no coinciden'
+    return
+  }
+
   isSubmitting.value = true
   try {
-    const endpoint = props.kind === 'folder' ? `/files/folders/${props.id}` : `/files/${props.id}`
-    const res = await api.put<ApiResponse<Folder | FileItem>>(endpoint, { name: name.value })
-    emit('renamed', res.data)
+    const res = await api.put<ApiResponse<User>>(`/users/${props.user.id}/password`, {
+      newPassword: newPassword.value,
+    })
+    emit('updated', res.data || { ...props.user })
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Error al renombrar'
+    error.value = e instanceof Error ? e.message : 'Error al cambiar la contraseña'
   } finally {
     isSubmitting.value = false
   }
@@ -38,8 +44,8 @@ async function handleSubmit() {
     <div class="modal">
       <div class="modal-header">
         <div class="modal-title-wrapper">
-          <i class="ph ph-pencil-simple title-icon"></i>
-          <h3 class="modal-title">Renombrar</h3>
+          <i class="ph ph-password title-icon"></i>
+          <h3 class="modal-title">Cambiar contraseña</h3>
         </div>
         <button class="close-btn" @click="$emit('close')">
           <i class="ph ph-x"></i>
@@ -47,15 +53,41 @@ async function handleSubmit() {
       </div>
 
       <form @submit.prevent="handleSubmit" class="modal-form">
+        <div class="user-subtitle">
+          <div class="user-avatar">{{ user.username.charAt(0).toUpperCase() }}</div>
+          <span>{{ user.username }}</span>
+        </div>
+
         <div class="form-group">
-          <label for="rename-name">Nuevo nombre</label>
-          <input 
-            id="rename-name" 
-            v-model="name" 
-            type="text" 
-            autofocus 
-            required 
-          />
+          <label for="new-password">Nueva contraseña</label>
+          <div class="input-wrapper">
+            <i class="ph ph-lock-key"></i>
+            <input
+              id="new-password"
+              v-model="newPassword"
+              type="password"
+              autocomplete="new-password"
+              minlength="8"
+              placeholder="Mínimo 8 caracteres"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="confirm-password">Confirmar contraseña</label>
+          <div class="input-wrapper">
+            <i class="ph ph-lock-key"></i>
+            <input
+              id="confirm-password"
+              v-model="confirmPassword"
+              type="password"
+              autocomplete="new-password"
+              minlength="8"
+              placeholder="Vuelve a escribir la contraseña"
+              required
+            />
+          </div>
         </div>
 
         <div v-if="error" class="error-msg">
@@ -65,9 +97,9 @@ async function handleSubmit() {
 
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" @click="$emit('close')">Cancelar</button>
-          <button type="submit" class="btn btn-primary" :disabled="isSubmitting || !name.trim() || name === currentName">
+          <button type="submit" class="btn btn-primary" :disabled="isSubmitting">
             <i :class="isSubmitting ? 'ph ph-spinner-gap spin' : 'ph ph-check'"></i>
-            <span>{{ isSubmitting ? 'Guardando...' : 'Guardar cambios' }}</span>
+            <span>{{ isSubmitting ? 'Guardando...' : 'Guardar contraseña' }}</span>
           </button>
         </div>
       </form>
@@ -113,7 +145,7 @@ async function handleSubmit() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
 .modal-title-wrapper {
@@ -160,6 +192,30 @@ async function handleSubmit() {
   gap: 1.25rem;
 }
 
+.user-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-background-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  color: var(--color-heading);
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
@@ -172,8 +228,24 @@ async function handleSubmit() {
   color: var(--color-heading);
 }
 
-.form-group input {
-  padding: 0.75rem 1rem;
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-wrapper i {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+}
+
+.input-wrapper input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-background-soft);
@@ -184,10 +256,15 @@ async function handleSubmit() {
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.form-group input:focus {
+.input-wrapper input:focus {
   border-color: var(--brand-primary);
   background: var(--color-background);
   box-shadow: 0 0 0 3px var(--brand-primary-light);
+}
+
+.input-wrapper input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.7;
 }
 
 .error-msg {

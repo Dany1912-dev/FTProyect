@@ -18,7 +18,6 @@ async function handleLogin() {
   isLoading.value = true
 
   try {
-    // El backend setea las cookies HttpOnly, el body solo devuelve datos del usuario
     const res = await api.post<ApiResponse<User>>('/auth/login', {
       username: username.value,
       password: password.value,
@@ -41,38 +40,54 @@ async function handleLogin() {
 
 <template>
   <div class="login-card">
-    <h1 class="login-title">FTPCloud</h1>
-    <p class="login-subtitle">Inicia sesion para continuar</p>
+    <div class="login-header">
+      <div class="logo-icon">
+        <i class="ph ph-cloud"></i>
+      </div>
+      <h1 class="login-title">FTPCloud</h1>
+      <p class="login-subtitle">Inicia sesión para continuar</p>
+    </div>
 
     <form @submit.prevent="handleLogin" class="login-form">
       <div class="form-group">
         <label for="username">Usuario</label>
-        <input
-          id="username"
-          v-model="username"
-          type="text"
-          autocomplete="username"
-          placeholder="Tu usuario"
-          required
-        />
+        <div class="input-wrapper">
+          <i class="ph ph-user input-icon"></i>
+          <input
+            id="username"
+            v-model="username"
+            type="text"
+            autocomplete="username"
+            placeholder="Tu usuario"
+            required
+          />
+        </div>
       </div>
 
       <div class="form-group">
-        <label for="password">Contrasena</label>
-        <input
-          id="password"
-          v-model="password"
-          type="password"
-          autocomplete="current-password"
-          placeholder="Tu contrasena"
-          required
-        />
+        <label for="password">Contraseña</label>
+        <div class="input-wrapper">
+          <i class="ph ph-lock-key input-icon"></i>
+          <input
+            id="password"
+            v-model="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Tu contraseña"
+            required
+          />
+        </div>
       </div>
 
-      <p v-if="error" class="error-msg">{{ error }}</p>
+      <div v-if="error" class="error-msg">
+        <i class="ph ph-warning-circle"></i>
+        <span>{{ error }}</span>
+      </div>
 
       <button type="submit" class="login-btn" :disabled="isLoading">
-        {{ isLoading ? 'Entrando...' : 'Entrar' }}
+        <i v-if="isLoading" class="ph ph-spinner-gap spin"></i>
+        <span>{{ isLoading ? 'Entrando...' : 'Entrar' }}</span>
+        <i v-if="!isLoading" class="ph ph-arrow-right"></i>
       </button>
     </form>
   </div>
@@ -80,84 +95,181 @@ async function handleLogin() {
 
 <style scoped>
 .login-card {
-  background: var(--color-background-soft);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 2.5rem 2rem;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 3rem 2.5rem;
   width: 100%;
-  max-width: 380px;
+  max-width: 420px;
+  box-shadow: var(--shadow-float);
+  animation: slideUp 0.5s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.logo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-hover));
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  box-shadow: var(--shadow-md);
 }
 
 .login-title {
   font-size: 1.75rem;
   font-weight: 700;
-  margin: 0 0 0.25rem;
+  margin: 0 0 0.5rem;
   color: var(--color-heading);
+  letter-spacing: -0.02em;
 }
 
 .login-subtitle {
-  color: var(--color-text);
-  margin: 0 0 2rem;
+  color: var(--color-text-muted);
+  margin: 0;
   font-size: 0.95rem;
 }
 
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
 .form-group label {
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-heading);
 }
 
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 1rem;
+  font-size: 1.25rem;
+  color: var(--color-text-muted);
+  transition: color var(--transition-fast);
+}
+
 .form-group input {
-  padding: 0.6rem 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 3rem;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-background);
-  color: var(--color-text);
+  border-radius: var(--radius-md);
+  background: var(--color-background-soft);
+  color: var(--color-heading);
   font-size: 0.95rem;
+  font-family: inherit;
   outline: none;
-  transition: border-color 0.15s;
+  transition: all var(--transition-fast);
+}
+
+.form-group input::placeholder {
+  color: var(--color-text-muted);
 }
 
 .form-group input:focus {
-  border-color: var(--color-heading);
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px var(--brand-primary-light);
+}
+
+.form-group input:focus + .input-icon,
+.form-group input:focus ~ .input-icon /* Depending on DOM order, but here icon is before input. So we use focus-within on wrapper */ {
+  color: var(--brand-primary);
+}
+
+.input-wrapper:focus-within .input-icon {
+  color: var(--brand-primary);
 }
 
 .error-msg {
-  color: #e05252;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
   font-size: 0.875rem;
+  font-weight: 500;
   margin: 0;
 }
 
+.error-msg i {
+  font-size: 1.1rem;
+}
+
 .login-btn {
-  padding: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem;
   background-color: var(--color-heading);
   color: var(--color-background);
   border: none;
-  border-radius: 6px;
-  font-size: 0.95rem;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: all var(--transition-fast);
+  margin-top: 0.5rem;
 }
 
 .login-btn:hover:not(:disabled) {
-  opacity: 0.85;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  background-color: var(--brand-primary);
+  color: white;
+}
+
+.login-btn:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .login-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.7;
   cursor: not-allowed;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>

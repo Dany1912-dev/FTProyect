@@ -85,4 +85,38 @@ public class UserService(
 
         return user.ToDto(await folderRepository.GetTotalSizeForOwnerAsync(user.Id));
     }
+
+    public async Task<UserDto> UpdateRoleAsync(Guid id, string role, UserRole operatorRole)
+    {
+        if (operatorRole != UserRole.Owner)
+            throw new ServiceException(403, "Solo el owner puede cambiar roles");
+
+        if (!Enum.TryParse<UserRole>(role, ignoreCase: true, out var requestedRole))
+            throw new ServiceException(400, "Rol inválido");
+
+        var user = await userRepository.GetByIdAsync(id)
+            ?? throw new ServiceException(404, "Usuario no encontrado");
+
+        if (user.Role == UserRole.Owner)
+            throw new ServiceException(403, "No se puede cambiar el rol del owner");
+
+        if (requestedRole == UserRole.Owner)
+            throw new ServiceException(403, "No se puede asignar el rol de owner a otro usuario");
+
+        user.Role = requestedRole;
+        await userRepository.SaveChangesAsync();
+
+        return user.ToDto(await folderRepository.GetTotalSizeForOwnerAsync(user.Id));
+    }
+
+    public async Task<UserDto> UpdatePasswordAsync(Guid id, string newPassword)
+    {
+        var user = await userRepository.GetByIdAsync(id)
+            ?? throw new ServiceException(404, "Usuario no encontrado");
+
+        user.PasswordHash = passwordHasher.Hash(newPassword);
+        await userRepository.SaveChangesAsync();
+
+        return user.ToDto(await folderRepository.GetTotalSizeForOwnerAsync(user.Id));
+    }
 }

@@ -27,4 +27,12 @@ public class UsersController(IUserService userService) : ApiControllerBase
     [HttpPut("{id}/quota"), Authorize(Roles = "Owner")]
     public async Task<ActionResult<ApiResponse<UserDto>>> UpdateQuota(Guid id, UpdateQuotaRequest request) =>
         ApiOk(await userService.UpdateQuotaAsync(id, request.QuotaBytes));
+
+    [HttpPut("{id}/role"), Authorize(Roles = "Owner")]
+    public async Task<ActionResult<ApiResponse<UserDto>>> UpdateRole(Guid id, UpdateRoleRequest request) =>
+        ApiOk(await userService.UpdateRoleAsync(id, request.Role, User.GetRole()));
+
+    [HttpPut("{id}/password"), Authorize(Roles = "Owner")]
+    public async Task<ActionResult<ApiResponse<UserDto>>> UpdatePassword(Guid id, UpdatePasswordRequest request) =>
+        ApiOk(await userService.UpdatePasswordAsync(id, request.NewPassword));
 }

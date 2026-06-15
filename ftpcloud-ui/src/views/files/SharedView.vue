@@ -142,41 +142,52 @@ function formatSize(bytes: number): string {
 </script>
 
 <template>
-  <div>
+  <div class="page-container">
     <div class="page-header">
       <div class="breadcrumb">
         <span class="breadcrumb-item" :class="{ link: filesStore.currentFolder }" @click="goToRoot">
+          <i class="ph ph-users"></i>
           Compartidos
         </span>
         <template v-for="p in filesStore.path" :key="p.id">
-          <span class="separator">/</span>
+          <i class="ph ph-caret-right separator"></i>
           <span class="breadcrumb-item link" @click="load(p.id)">{{ p.name }}</span>
         </template>
         <template v-if="filesStore.currentFolder">
-          <span class="separator">/</span>
+          <i class="ph ph-caret-right separator"></i>
           <span class="breadcrumb-item current">{{ filesStore.currentFolder.name }}</span>
         </template>
       </div>
 
       <div v-if="filesStore.currentFolder && myRole === 'editor'" class="header-actions">
-        <button class="header-btn" @click="showCreateFolder = true">+ Nueva subcarpeta</button>
-        <button class="header-btn" :disabled="uploadProgress !== null" @click="triggerUpload">
-          {{ uploadProgress !== null ? `Subiendo... ${uploadProgress}%` : '+ Subir archivo' }}
+        <button class="btn btn-secondary" @click="showCreateFolder = true">
+          <i class="ph ph-folder-plus"></i>
+          <span class="btn-text">Nueva subcarpeta</span>
+        </button>
+        <button class="btn btn-primary" :disabled="uploadProgress !== null" @click="triggerUpload">
+          <i :class="uploadProgress !== null ? 'ph ph-spinner-gap spin' : 'ph ph-upload-simple'"></i>
+          <span class="btn-text">{{ uploadProgress !== null ? `Subiendo... ${uploadProgress}%` : 'Subir archivo' }}</span>
         </button>
         <input ref="fileInput" type="file" class="hidden-input" @change="onFileSelected" />
       </div>
     </div>
 
-    <p v-if="filesStore.currentFolder" class="folder-subtitle">
-      Compartido por {{ filesStore.currentFolder.ownerUsername }} — tu rol:
-      {{ myRole === 'editor' ? 'editor' : 'lector' }}
-    </p>
+    <div v-if="filesStore.currentFolder" class="folder-subtitle-card">
+      <i class="ph ph-info"></i>
+      <span>Compartido por <strong>{{ filesStore.currentFolder.ownerUsername }}</strong>. Tu rol: <strong>{{ myRole === 'editor' ? 'Editor' : 'Lector' }}</strong></span>
+    </div>
 
-    <div v-if="filesStore.isLoading" class="loading">Cargando archivos...</div>
+    <div v-if="filesStore.isLoading" class="loading-state">
+      <i class="ph ph-circle-notch spin loading-icon"></i>
+      <p>Cargando archivos compartidos...</p>
+    </div>
 
-    <div v-else>
+    <div v-else class="content-area">
       <div v-if="filesStore.folders.length" class="section">
-        <h3 class="section-title">Carpetas</h3>
+        <div class="section-header">
+          <h3 class="section-title">Carpetas</h3>
+          <span class="badge">{{ filesStore.folders.length }}</span>
+        </div>
         <div class="folders-grid">
           <div
             v-for="folder in filesStore.folders"
@@ -184,29 +195,56 @@ function formatSize(bytes: number): string {
             class="folder-card"
             @click="openFolder(folder)"
           >
-            <span class="folder-icon">📁</span>
-            <span class="folder-name">{{ folder.name }}</span>
-            <span class="folder-owner">de {{ folder.ownerUsername }}</span>
-            <div v-if="myRole === 'editor'" class="folder-actions">
-              <button class="action-btn" @click.stop="handleRenameFolder(folder)">Renombrar</button>
-              <button class="action-btn" @click.stop="handleMoveFolder(folder)">Mover</button>
+            <div class="folder-icon-wrapper">
+              <i class="ph-fill ph-folder folder-icon"></i>
+            </div>
+            <div class="folder-info">
+              <span class="folder-name" :title="folder.name">{{ folder.name }}</span>
+              <span class="folder-owner">de {{ folder.ownerUsername }}</span>
+            </div>
+            <div v-if="myRole === 'editor'" class="folder-actions-menu" @click.stop>
+              <button class="icon-action-btn" @click="handleRenameFolder(folder)" title="Renombrar">
+                <i class="ph ph-pencil-simple"></i>
+              </button>
+              <button class="icon-action-btn" @click="handleMoveFolder(folder)" title="Mover">
+                <i class="ph ph-folder-notch-open"></i>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
       <div v-if="filesStore.files.length" class="section">
-        <h3 class="section-title">Archivos</h3>
+        <div class="section-header">
+          <h3 class="section-title">Archivos</h3>
+          <span class="badge">{{ filesStore.files.length }}</span>
+        </div>
         <div class="files-list">
+          <div class="file-list-header">
+            <div class="col-name">Nombre</div>
+            <div class="col-size">Tamaño</div>
+            <div class="col-actions"></div>
+          </div>
           <div v-for="file in filesStore.files" :key="file.id" class="file-row">
-            <span class="file-name">{{ file.name }}</span>
-            <span class="file-size">{{ formatSize(file.size) }}</span>
-            <div class="file-actions">
-              <a class="action-btn" :href="`${BASE_URL}/files/${file.id}/download`" download>Descargar</a>
+            <div class="col-name">
+              <i class="ph ph-file-text file-icon"></i>
+              <span class="file-name" :title="file.name">{{ file.name }}</span>
+            </div>
+            <div class="col-size">{{ formatSize(file.size) }}</div>
+            <div class="col-actions file-actions">
+              <a class="icon-action-btn" :href="`${BASE_URL}/files/${file.id}/download`" download title="Descargar">
+                <i class="ph ph-download-simple"></i>
+              </a>
               <template v-if="myRole === 'editor'">
-                <button class="action-btn" @click="handleRenameFile(file)">Renombrar</button>
-                <button class="action-btn" @click="handleMoveFile(file)">Mover</button>
-                <button class="action-btn danger" @click="handleDeleteFile(file)">Eliminar</button>
+                <button class="icon-action-btn" @click="handleRenameFile(file)" title="Renombrar">
+                  <i class="ph ph-pencil-simple"></i>
+                </button>
+                <button class="icon-action-btn" @click="handleMoveFile(file)" title="Mover">
+                  <i class="ph ph-folder-notch-open"></i>
+                </button>
+                <button class="icon-action-btn danger" @click="handleDeleteFile(file)" title="Eliminar">
+                  <i class="ph ph-trash"></i>
+                </button>
               </template>
             </div>
           </div>
@@ -214,8 +252,12 @@ function formatSize(bytes: number): string {
       </div>
 
       <div v-if="!filesStore.folders.length && !filesStore.files.length" class="empty-state">
-        <p v-if="filesStore.currentFolder">Esta carpeta está vacía.</p>
-        <p v-else>Nadie ha compartido nada contigo todavía.</p>
+        <div class="empty-icon-wrapper">
+          <i class="ph ph-share-network empty-icon"></i>
+        </div>
+        <h3 class="empty-title" v-if="filesStore.currentFolder">Esta carpeta compartida está vacía</h3>
+        <h3 class="empty-title" v-else>No hay archivos compartidos</h3>
+        <p class="empty-desc" v-if="!filesStore.currentFolder">Nadie ha compartido archivos o carpetas contigo todavía.</p>
       </div>
     </div>
 
@@ -249,22 +291,46 @@ function formatSize(bytes: number): string {
 </template>
 
 <style scoped>
+.page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
   gap: 1rem;
   flex-wrap: wrap;
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 
 .breadcrumb {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--color-heading);
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: color var(--transition-fast);
 }
 
 .breadcrumb-item.link {
@@ -272,177 +338,378 @@ function formatSize(bytes: number): string {
 }
 
 .breadcrumb-item.link:hover {
-  text-decoration: underline;
+  color: var(--brand-primary);
 }
 
 .breadcrumb-item.current {
   color: var(--color-text);
+  font-weight: 600;
 }
 
 .separator {
-  color: var(--color-text);
+  color: var(--color-text-muted);
+  font-size: 1rem;
 }
 
-.folder-subtitle {
-  margin: 0 0 1.5rem;
-  font-size: 0.875rem;
-  color: var(--color-text);
+.folder-subtitle-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--brand-primary-light);
+  color: var(--brand-primary-hover);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-top: -1rem;
+}
+
+.folder-subtitle-card i {
+  font-size: 1.25rem;
 }
 
 .header-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .hidden-input {
   display: none;
 }
 
-.header-btn {
-  padding: 0.5rem 1rem;
-  background: var(--color-heading);
-  color: var(--color-background);
-  border: none;
-  border-radius: 6px;
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-md);
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
 }
 
-.header-btn:hover:not(:disabled) {
-  opacity: 0.85;
+.btn i {
+  font-size: 1.1rem;
 }
 
-.header-btn:disabled {
-  opacity: 0.5;
+.btn-primary {
+  background: var(--brand-primary);
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--brand-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-secondary {
+  background: var(--color-background-soft);
+  color: var(--color-heading);
+  border-color: var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-background-mute);
+  border-color: var(--color-border-hover);
+}
+
+.btn:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
-.loading {
-  color: var(--color-text);
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+  color: var(--color-text-muted);
+  gap: 1rem;
+}
+
+.loading-icon {
+  font-size: 2.5rem;
+  color: var(--brand-primary);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .section {
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
 }
 
 .section-title {
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: var(--color-heading);
+  margin: 0;
+}
+
+.badge {
+  background: var(--color-background-mute);
   color: var(--color-text);
-  margin: 0 0 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .folders-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
 }
 
 .folder-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 1rem;
+  gap: 1rem;
+  padding: 1.25rem;
   background: var(--color-background-soft);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all var(--transition-normal);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
 .folder-card:hover {
-  background: var(--color-background-mute);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-hover);
+}
+
+.folder-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-primary-light);
+  color: var(--brand-primary);
 }
 
 .folder-icon {
-  font-size: 2rem;
+  font-size: 1.75rem;
+}
+
+.folder-info {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
 }
 
 .folder-name {
-  font-size: 0.85rem;
-  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 600;
   color: var(--color-heading);
-  font-weight: 500;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
 }
 
 .folder-owner {
   font-size: 0.75rem;
-  color: var(--color-text);
-  text-align: center;
+  color: var(--color-text-muted);
 }
 
-.folder-actions {
+.folder-actions-menu {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
   display: flex;
-  gap: 0.35rem;
+  gap: 0.25rem;
+  opacity: 0;
+  transform: translateX(10px);
+  transition: all var(--transition-fast);
+  background: var(--color-background-soft);
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+}
+
+.folder-card:hover .folder-actions-menu {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .files-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  background: var(--color-background-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.file-list-header {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  background: var(--color-background-mute);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
 }
 
 .file-row {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  background: var(--color-background-soft);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+  transition: background var(--transition-fast);
+}
+
+.file-row:last-child {
+  border-bottom: none;
+}
+
+.file-row:hover {
+  background: var(--color-background-mute);
+}
+
+.col-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.file-icon {
+  font-size: 1.5rem;
+  color: var(--brand-primary);
 }
 
 .file-name {
-  flex: 1;
   font-size: 0.9rem;
+  font-weight: 500;
   color: var(--color-heading);
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.file-size {
-  font-size: 0.8rem;
-  color: var(--color-text);
-  flex-shrink: 0;
+.col-size {
+  width: 120px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
 }
 
-.file-actions {
+.col-actions {
+  width: 140px;
   display: flex;
-  gap: 0.4rem;
-  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  opacity: 0.4;
+  transition: opacity var(--transition-fast);
 }
 
-.action-btn {
-  display: inline-block;
-  padding: 0.3rem 0.6rem;
-  border-radius: 4px;
-  border: 1px solid var(--color-border);
-  background: var(--color-background);
-  font-size: 0.8rem;
-  cursor: pointer;
+.file-row:hover .col-actions {
+  opacity: 1;
+}
+
+.icon-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 1.1rem;
   color: var(--color-text);
-  text-decoration: none;
-  line-height: 1.2;
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
-.action-btn.danger {
-  background: #fee2e2;
-  color: #991b1b;
-  border-color: #fecaca;
+.icon-action-btn:hover {
+  background: var(--color-border);
+  color: var(--color-heading);
+}
+
+.icon-action-btn.danger:hover {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
 }
 
 .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 5rem 2rem;
   text-align: center;
-  padding: 3rem;
-  color: var(--color-text);
+  background: var(--color-background-soft);
+  border: 1px dashed var(--color-border-hover);
+  border-radius: var(--radius-md);
+}
+
+.empty-icon-wrapper {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-full);
+  background: var(--brand-primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  color: var(--brand-primary);
+}
+
+.empty-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-heading);
+  margin: 0 0 0.5rem;
+}
+
+.empty-desc {
+  color: var(--color-text-muted);
   font-size: 0.95rem;
+  max-width: 400px;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .btn-text {
+    display: none;
+  }
+  .col-size {
+    display: none;
+  }
 }
 </style>

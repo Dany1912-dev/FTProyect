@@ -87,9 +87,20 @@ async function moveTo(targetFolderId: string | null) {
 <template>
   <div class="overlay" @click.self="$emit('close')">
     <div class="modal">
-      <h3 class="modal-title">Mover a...</h3>
+      <div class="modal-header">
+        <div class="modal-title-wrapper">
+          <i class="ph ph-folder-notch-open title-icon"></i>
+          <h3 class="modal-title">Mover a...</h3>
+        </div>
+        <button class="close-btn" @click="$emit('close')">
+          <i class="ph ph-x"></i>
+        </button>
+      </div>
 
-      <div v-if="isLoading" class="loading">Cargando...</div>
+      <div v-if="isLoading" class="loading-state">
+        <i class="ph ph-circle-notch spin loading-icon"></i>
+        <p>Cargando destinos...</p>
+      </div>
 
       <div v-else class="tree">
         <button
@@ -98,25 +109,34 @@ async function moveTo(targetFolderId: string | null) {
           :disabled="isSubmitting"
           @click="moveTo(null)"
         >
-          📁 Raíz (mover fuera de cualquier carpeta)
+          <i class="ph ph-house"></i>
+          <span>Directorio raíz</span>
         </button>
 
         <button
           v-for="{ node, depth } in flatTree"
           :key="node.id"
           class="tree-item"
-          :style="{ paddingLeft: `${0.75 + depth}rem` }"
+          :style="{ paddingLeft: `${1 + depth * 1.25}rem` }"
           :disabled="isSubmitting"
           @click="moveTo(node.id)"
         >
-          📁 {{ node.name }}
+          <i class="ph-fill ph-folder"></i>
+          <span>{{ node.name }}</span>
         </button>
+
+        <div v-if="flatTree.length === 0 && kind !== 'folder'" class="empty-state">
+          No hay carpetas de destino disponibles.
+        </div>
       </div>
 
-      <p v-if="error" class="error-msg">{{ error }}</p>
+      <div v-if="error" class="error-msg">
+        <i class="ph ph-warning-circle"></i>
+        <span>{{ error }}</span>
+      </div>
 
       <div class="modal-actions">
-        <button type="button" class="btn-cancel" @click="$emit('close')">Cancelar</button>
+        <button type="button" class="btn btn-secondary" @click="$emit('close')">Cancelar</button>
       </div>
     </div>
   </div>
@@ -126,35 +146,106 @@ async function moveTo(targetFolderId: string | null) {
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 100;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modal {
   background: var(--color-background);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 1.5rem;
   width: 100%;
-  max-width: 420px;
-  max-height: 80vh;
+  max-width: 440px;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.modal-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.title-icon {
+  font-size: 1.5rem;
+  color: var(--brand-primary);
 }
 
 .modal-title {
   font-size: 1.25rem;
   font-weight: 700;
-  margin: 0 0 1.25rem;
+  margin: 0;
   color: var(--color-heading);
 }
 
-.loading {
-  color: var(--color-text);
-  font-size: 0.9rem;
+.close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.close-btn:hover {
+  background: var(--color-background-mute);
+  color: var(--color-heading);
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 0;
+  color: var(--color-text-muted);
+  gap: 1rem;
+}
+
+.loading-icon {
+  font-size: 2rem;
+  color: var(--brand-primary);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .tree {
@@ -163,41 +254,94 @@ async function moveTo(targetFolderId: string | null) {
   gap: 0.25rem;
   overflow-y: auto;
   max-height: 50vh;
+  padding: 0.25rem;
+  background: var(--color-background-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: 0.5rem;
+}
+
+/* Custom Scrollbar for tree */
+.tree::-webkit-scrollbar {
+  width: 6px;
+}
+.tree::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tree::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-hover);
+  border-radius: 10px;
 }
 
 .tree-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   text-align: left;
-  padding: 0.5rem 0.75rem;
+  padding: 0.6rem 0.75rem;
   border: 1px solid transparent;
   border-radius: 6px;
-  background: none;
-  color: var(--color-text);
-  font-size: 0.9rem;
+  background: transparent;
+  color: var(--color-heading);
+  font-size: 0.95rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all var(--transition-fast);
+}
+
+.tree-item i {
+  font-size: 1.25rem;
+  color: var(--brand-primary);
 }
 
 .tree-item:hover:not(:disabled) {
   background: var(--color-background-mute);
+  border-color: var(--color-border);
+  transform: translateX(2px);
 }
 
 .tree-item:disabled {
-  opacity: 0.4;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .tree-item.root {
   font-weight: 600;
   border-bottom: 1px solid var(--color-border);
-  border-radius: 0;
+  border-radius: 6px 6px 0 0;
   margin-bottom: 0.25rem;
-  padding-bottom: 0.6rem;
+  padding-bottom: 0.75rem;
+  background: var(--color-background);
+}
+.tree-item.root:hover:not(:disabled) {
+  background: var(--color-background-mute);
+  transform: none;
+}
+.tree-item.root i {
+  color: var(--color-heading);
+}
+
+.empty-state {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
 }
 
 .error-msg {
-  color: #e05252;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
   font-size: 0.875rem;
-  margin: 0.75rem 0 0;
+  margin-top: 0.5rem;
+}
+
+.error-msg i {
+  font-size: 1.1rem;
 }
 
 .modal-actions {
@@ -207,19 +351,27 @@ async function moveTo(targetFolderId: string | null) {
   margin-top: 1rem;
 }
 
-.btn-cancel {
-  padding: 0.6rem 1.1rem;
-  border: none;
-  border-radius: 6px;
+.btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--radius-md);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  background: var(--color-background-mute);
-  color: var(--color-text);
-  transition: opacity 0.15s;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
 }
 
-.btn-cancel:hover {
-  opacity: 0.85;
+.btn-secondary {
+  background: var(--color-background-mute);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.btn-secondary:hover {
+  background: var(--color-border);
+  color: var(--color-heading);
 }
 </style>
