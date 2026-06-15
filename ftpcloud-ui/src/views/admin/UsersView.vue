@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useUsersStore } from '@/stores/users'
 import { useAuthStore } from '@/stores/auth'
+import { useDialogStore } from '@/stores/dialog'
 import { api } from '@/services/api'
+import CreateUserModal from '@/components/users/CreateUserModal.vue'
 import type { ApiResponse, User } from '@/types'
 
 const usersStore = useUsersStore()
 const auth = useAuthStore()
+const dialog = useDialogStore()
+
+const showCreateModal = ref(false)
 
 onMounted(async () => {
   usersStore.setLoading(true)
@@ -19,13 +24,38 @@ onMounted(async () => {
     usersStore.setLoading(false)
   }
 })
+
+function onCreated(user: User) {
+  usersStore.addUser(user)
+  showCreateModal.value = false
+}
+
+async function handleDelete(user: User) {
+  const confirmed = await dialog.confirm({
+    title: 'Eliminar usuario',
+    message: `¿Eliminar al usuario "${user.username}"? Esta accion no se puede deshacer.`,
+    confirmText: 'Eliminar',
+    danger: true,
+  })
+  if (!confirmed) return
+
+  try {
+    await api.delete(`/users/${user.id}`)
+    usersStore.removeUser(user.id)
+  } catch (e) {
+    await dialog.alert({
+      title: 'Error',
+      message: e instanceof Error ? e.message : 'Error al eliminar el usuario',
+    })
+  }
+}
 </script>
 
 <template>
   <div>
     <div class="page-header">
       <h2>Usuarios</h2>
-      <button class="create-btn">+ Nuevo usuario</button>
+      <button class="create-btn" @click="showCreateModal = true">+ Nuevo usuario</button>
     </div>
 
     <div v-if="usersStore.isLoading" class="loading">Cargando...</div>
@@ -49,11 +79,19 @@ onMounted(async () => {
           </td>
           <td class="td-date">{{ new Date(user.createdAt).toLocaleDateString() }}</td>
           <td v-if="auth.isOwner" class="td-actions">
-            <button class="action-btn danger">Eliminar</button>
+            <button
+              class="action-btn danger"
+              :disabled="user.role === 'owner'"
+              @click="handleDelete(user)"
+            >
+              Eliminar
+            </button>
           </td>
         </tr>
       </tbody>
     </table>
+
+    <CreateUserModal v-if="showCreateModal" @close="showCreateModal = false" @created="onCreated" />
   </div>
 </template>
 
@@ -162,7 +200,12 @@ onMounted(async () => {
   color: #991b1b;
 }
 
-.action-btn.danger:hover {
+.action-btn.danger:hover:not(:disabled) {
   background: #fecaca;
+}
+
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>

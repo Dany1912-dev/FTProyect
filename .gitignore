@@ -18,8 +18,10 @@ Thumbs.db
 ftpcloud-ui/node_modules/
 ftpcloud-ui/dist/
 ftpcloud-ui/*.tsbuildinfo
+ftpcloud-ui/.cert/
 
-# Backend (ASP.NET) — cuando se cree
-ftpcloud-api/bin/
-ftpcloud-api/obj/
-ftpcloud-api/*.user
+# Backend (ASP.NET)
+ftpcloud-api/**/bin/
+ftpcloud-api/**/obj/
+ftpcloud-api/**/*.user
+ftpcloud-api/src/FtpCloud.Api/storage/

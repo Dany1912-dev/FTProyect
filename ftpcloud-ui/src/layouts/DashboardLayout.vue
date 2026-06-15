@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/api'
+import ChangePasswordModal from '@/components/common/ChangePasswordModal.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
+
+const showChangePassword = ref(false)
 
 async function handleLogout() {
   try {
@@ -40,13 +44,18 @@ async function handleLogout() {
 
       <div class="sidebar-footer">
         <span class="sidebar-username">{{ auth.user?.username }}</span>
-        <button class="logout-btn" @click="handleLogout">Salir</button>
+        <div class="footer-actions">
+          <button class="footer-btn" @click="showChangePassword = true">Contraseña</button>
+          <button class="footer-btn" @click="handleLogout">Salir</button>
+        </div>
       </div>
     </aside>
 
     <main class="main-content">
       <RouterView />
     </main>
+
+    <ChangePasswordModal v-if="showChangePassword" @close="showChangePassword = false" />
   </div>
 </template>
 
@@ -108,8 +117,8 @@ async function handleLogout() {
 
 .sidebar-footer {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 0.5rem;
   padding-top: 0.75rem;
   border-top: 1px solid var(--color-border);
   font-size: 0.85rem;
@@ -120,19 +129,27 @@ async function handleLogout() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 600;
 }
 
-.logout-btn {
+.footer-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.footer-btn {
+  flex: 1;
   background: none;
   border: none;
   cursor: pointer;
   color: var(--color-text);
-  font-size: 0.85rem;
-  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.5rem;
   border-radius: 4px;
+  text-align: center;
 }
 
-.logout-btn:hover {
+.footer-btn:hover {
   background-color: var(--color-background-mute);
 }
 

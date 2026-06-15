@@ -11,7 +11,6 @@ const app = createApp(App)
 const pinia = createPinia()
 
 app.use(pinia)
-app.use(router)
 
 const authStore = useAuthStore()
 
@@ -21,8 +20,11 @@ window.addEventListener('auth:logout', () => {
   router.push('/login')
 })
 
-// Intentar restaurar la sesion antes de montar la app
-// Esto evita que el router guard redirija al login innecesariamente al recargar
+// Restaurar la sesion ANTES de instalar el router: app.use(router) dispara
+// la navegacion inicial (y su guard) de forma sincrona. Si el router se
+// instala antes de que esto resuelva, el guard corre con user=null y manda
+// a /login aunque la cookie sea valida.
 authStore.restoreSession().finally(() => {
+  app.use(router)
   app.mount('#app')
 })

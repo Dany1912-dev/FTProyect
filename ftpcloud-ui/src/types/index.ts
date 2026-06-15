@@ -13,6 +13,7 @@ export interface Folder {
   name: string
   type: 'personal' | 'shared' | 'group'
   ownerId: string
+  ownerUsername: string
   createdAt: string
 }
 
@@ -22,14 +23,21 @@ export interface FileItem {
   size: number
   mimeType: string
   folderId: string
-  uploadedBy: string
+  uploadedBy: string | null
   createdAt: string
 }
 
-export interface GroupMember {
+export interface FolderMemberInfo {
   userId: string
-  folderId: string
+  username: string
   role: 'editor' | 'viewer'
+}
+
+export interface FolderContents {
+  folder?: Folder
+  folders: Folder[]
+  files: FileItem[]
+  myRole?: 'owner' | 'editor' | 'viewer'
 }
 
 export interface ApiResponse<T> {

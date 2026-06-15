@@ -1,0 +1,48 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{3A8F2E44-558A-4825-AD79-12E8E8A93487}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FtpCloud.Domain", "src\FtpCloud.Domain\FtpCloud.Domain.csproj", "{99E24F64-1A3D-4E1B-BF34-17521DFBF248}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FtpCloud.Application", "src\FtpCloud.Application\FtpCloud.Application.csproj", "{9D8CC935-DFB1-4381-B144-EE1F0A216C6D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FtpCloud.Infrastructure", "src\FtpCloud.Infrastructure\FtpCloud.Infrastructure.csproj", "{AF7E1356-E248-4864-B1D1-A77C9876877C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FtpCloud.Api", "src\FtpCloud.Api\FtpCloud.Api.csproj", "{1D9B7037-3D8C-4F3C-9D95-4596993C0CEC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{99E24F64-1A3D-4E1B-BF34-17521DFBF248}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{99E24F64-1A3D-4E1B-BF34-17521DFBF248}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{99E24F64-1A3D-4E1B-BF34-17521DFBF248}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{99E24F64-1A3D-4E1B-BF34-17521DFBF248}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9D8CC935-DFB1-4381-B144-EE1F0A216C6D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9D8CC935-DFB1-4381-B144-EE1F0A216C6D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9D8CC935-DFB1-4381-B144-EE1F0A216C6D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9D8CC935-DFB1-4381-B144-EE1F0A216C6D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AF7E1356-E248-4864-B1D1-A77C9876877C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AF7E1356-E248-4864-B1D1-A77C9876877C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AF7E1356-E248-4864-B1D1-A77C9876877C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AF7E1356-E248-4864-B1D1-A77C9876877C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1D9B7037-3D8C-4F3C-9D95-4596993C0CEC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1D9B7037-3D8C-4F3C-9D95-4596993C0CEC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1D9B7037-3D8C-4F3C-9D95-4596993C0CEC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1D9B7037-3D8C-4F3C-9D95-4596993C0CEC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{99E24F64-1A3D-4E1B-BF34-17521DFBF248} = {3A8F2E44-558A-4825-AD79-12E8E8A93487}
+		{9D8CC935-DFB1-4381-B144-EE1F0A216C6D} = {3A8F2E44-558A-4825-AD79-12E8E8A93487}
+		{AF7E1356-E248-4864-B1D1-A77C9876877C} = {3A8F2E44-558A-4825-AD79-12E8E8A93487}
+		{1D9B7037-3D8C-4F3C-9D95-4596993C0CEC} = {3A8F2E44-558A-4825-AD79-12E8E8A93487}
+	EndGlobalSection
+EndGlobal
