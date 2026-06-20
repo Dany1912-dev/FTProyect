@@ -25,3 +25,6 @@ ftpcloud-api/**/bin/
 ftpcloud-api/**/obj/
 ftpcloud-api/**/*.user
 ftpcloud-api/src/FtpCloud.Api/storage/
+
+
+CLAUDE.md
